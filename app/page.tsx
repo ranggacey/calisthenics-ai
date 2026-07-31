@@ -13,7 +13,7 @@ export default function Home() {
         </p>
       </header>
       
-      <section className="grid w-full max-w-4xl grid-cols-1 gap-6 md:grid-cols-2 mb-12">
+      <section className="grid w-full max-w-5xl grid-cols-1 gap-6 md:grid-cols-3 mb-12">
         <Link href="/workout" className="rounded-lg border border-slate-700 bg-slate-800/50 p-6 shadow-lg transition-transform hover:scale-105 hover:bg-slate-800">
           <h3 className="text-2xl font-bold">Start Workout &rarr;</h3>
           <p className="mt-2 text-slate-400">
@@ -26,9 +26,15 @@ export default function Home() {
             See how you rank against other users.
           </p>
         </Link>
+        <Link href="/create-workout" className="rounded-lg border border-slate-700 bg-slate-800/50 p-6 shadow-lg transition-transform hover:scale-105 hover:bg-slate-800">
+          <h3 className="text-2xl font-bold">Create Workout &rarr;</h3>
+          <p className="mt-2 text-slate-400">
+            Design and save your own custom workout routines.
+          </p>
+        </Link>
       </section>
 
-      <div className="w-full max-w-4xl rounded-xl border-2 border-yellow-400/80 bg-gradient-to-br from-gray-800 to-gray-900 p-8 shadow-2xl">
+      <div className="w-full max-w-5xl rounded-xl border-2 border-yellow-400/80 bg-gradient-to-br from-gray-800 to-gray-900 p-8 shadow-2xl">
         <div className="text-center mb-6">
           <span className="text-sm font-bold uppercase tracking-widest text-yellow-400">Limited Time Event</span>
           <h2 className="mt-2 text-4xl font-extrabold">{seasonalChallenge.title}</h2>
