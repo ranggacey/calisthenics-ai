@@ -45,7 +45,7 @@
 - Set up environment variables for Replicate API key
 This project welcomes contributions from the community. Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to contribute and report issues.
 
-## [2026-07-31 17:00] feat: Add Custom Workout Creation Page
+## [2026-07-31 21:07] feat: add leaderboard page and data
 - Added a new page at `/create-workout` for users to build custom workout routines.
 - Installed `lucide-react` for icons.
 - Added a navigation card on the homepage to link to the new creation page.
