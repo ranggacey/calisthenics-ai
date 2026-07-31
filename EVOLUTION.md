@@ -37,6 +37,8 @@
 - Added navigation link from the main page
 
 ## Current Status
+
+## [2026-08-01 00:00] chore: plan next feature - Leaderboard enhancements and seasonal challenges
 ## Version 0.4.0 - Video Generator Integration
 - Added Video Generator AI project with Replicate API integration
 - Implemented video generation API endpoint (/api/generate)
@@ -45,12 +47,11 @@
 - Set up environment variables for Replicate API key
 This project welcomes contributions from the community. Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to contribute and report issues.
 
-## [2026-07-31 21:07] feat: add leaderboard page and data
-- Added a new page at `/create-workout` for users to build custom workout routines.
-- Installed `lucide-react` for icons.
-- Added a navigation card on the homepage to link to the new creation page.
-- Adjusted homepage grid layout to accommodate the new card.
-- Successfully built the project after the changes.
+## [2026-08-01 14:30] feat: add badge system UI
+- Added badges data file and BadgeCard component.
+- Updated homepage to display badges.
+- Updated TypeScript utils for cn helper.
+- Build succeeded.
 
 ## [2026-07-31 16:30] feat: Add Seasonal Challenge to Homepage
 - Added a new `seasonalChallenge` data structure in `src/lib/challenges.ts`.

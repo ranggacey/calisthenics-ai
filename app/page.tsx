@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { seasonalChallenge } from '@/lib/challenges';
+import { badges } from '@/lib/badges';
+import { BadgeCard } from '@/components/ui/BadgeCard';
 
 export default function Home() {
   return (
@@ -34,7 +36,7 @@ export default function Home() {
         </Link>
       </section>
 
-      <div className="w-full max-w-5xl rounded-xl border-2 border-yellow-400/80 bg-gradient-to-br from-gray-800 to-gray-900 p-8 shadow-2xl">
+      <div className="w-full max-w-5xl rounded-xl border-2 border-yellow-400/80 bg-gradient-to-br from-gray-800 to-gray-900 p-8 shadow-2xl mb-12">
         <div className="text-center mb-6">
           <span className="text-sm font-bold uppercase tracking-widest text-yellow-400">Limited Time Event</span>
           <h2 className="mt-2 text-4xl font-extrabold">{seasonalChallenge.title}</h2>
@@ -52,6 +54,15 @@ export default function Home() {
         </div>
         <p className="mt-6 text-center text-sm text-slate-500">Season ends: {new Date(seasonalChallenge.endDate).toLocaleDateString()}</p>
       </div>
+
+      <section className="w-full max-w-5xl mb-12">
+        <h2 className="text-2xl font-bold mb-4 text-white">Earn Badges</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          {badges.map((b) => (
+            <BadgeCard key={b.id} badge={b} />
+          ))}
+        </div>
+      </section>
 
       <footer className="mt-12 text-center text-slate-500">
         <p>Built with Next.js, MediaPipe & Web Audio API</p>
