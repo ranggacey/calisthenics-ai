@@ -1,12 +1,11 @@
-'use client';
-import { useEffect, useRef } from 'react';
+"use client";
+import React, { useEffect, useRef } from 'react';
 
 export default function PoseDetector() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    // MediaPipe pose needs to be loaded dynamically on the client
     const loadMediaPipe = async () => {
       const { Pose } = await import('@mediapipe/pose');
       const { Camera } = await import('@mediapipe/camera_utils');

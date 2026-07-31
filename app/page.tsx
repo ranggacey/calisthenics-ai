@@ -28,12 +28,20 @@ export default function Home() {
         </div>
       </section>
 
-      <Link 
-        href="/workout" 
-        className={styles.cta}
-      >
-        Start Workout →
-      </Link>
+      <div className="flex gap-4">
+        <Link 
+          href="/workout" 
+          className={styles.cta}
+        >
+          Start Workout →
+        </Link>
+        <Link 
+          href="/leaderboard" 
+          className={styles.cta}
+        >
+          Leaderboard →
+        </Link>
+      </div>
 
       <footer className={styles.footer}>
         <p>Built with Next.js, MediaPipe & Web Audio API</p>
