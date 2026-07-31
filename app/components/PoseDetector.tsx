@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useRef } from 'react';
+import * as cam from '@mediapipe/camera_utils';
+import * as draw from '@mediapipe/drawing_utils';
 import { Pose } from '@mediapipe/pose';
-import { Camera } from '@mediapipe/camera_utils';
-import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 
 export default function PoseDetector() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -31,13 +31,13 @@ export default function PoseDetector() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
       if (results.poseLandmarks) {
-        drawConnectors(ctx, results.poseLandmarks, [[11, 13], [13, 15], [12, 14], [14, 16], [11, 12], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28]], { color: '#00FF00', lineWidth: 5 });
-        drawLandmarks(ctx, results.poseLandmarks, { color: '#FF0000', lineWidth: 2 });
+        draw.drawConnectors(ctx, results.poseLandmarks, [[11, 13], [13, 15], [12, 14], [14, 16], [11, 12], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28]], { color: '#00FF00', lineWidth: 5 });
+        draw.drawLandmarks(ctx, results.poseLandmarks, { color: '#FF0000', lineWidth: 2 });
       }
       ctx.restore();
     });
 
-    const camera = new Camera(video, {
+    const camera = new cam.Camera(video, {
       onFrame: async () => {
         await pose.send({ image: video });
       },
