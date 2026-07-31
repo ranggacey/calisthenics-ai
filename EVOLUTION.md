@@ -44,3 +44,10 @@
 - Created comprehensive documentation for video generation workflow
 - Set up environment variables for Replicate API key
 This project welcomes contributions from the community. Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to contribute and report issues.
+
+## [2026-07-31 16:30] feat: Add Seasonal Challenge to Homepage
+- Added a new `seasonalChallenge` data structure in `src/lib/challenges.ts`.
+- Integrated a prominent "Seasonal Challenge" card into the homepage (`app/page.tsx`).
+- Restructured the project to use the `src` directory for better organization.
+- Updated `tsconfig.json` to reflect the new `src` directory structure.
+- Successfully built the project after the changes.
