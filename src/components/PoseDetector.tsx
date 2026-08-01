@@ -2,10 +2,13 @@
 
 // ============================================================
 // Calisthenics AI Trainer — core workout engine (client-side)
-// Rep counting berbasis GERAKAN ASLI pengguna:
-//   - Push-Up/Squat: posisi atas → bawah (full range) → atas lagi = 1 rep
-//   - Form jelek (range gerak kurang / angle di luar toleransi) = reps TIDAK nambah
-//   - Plank: hold timer selama badan lurus
+// Rep counting berbasis GERAKAN ASLI pengguna, dengan guard ketat:
+//   - EMA smoothing anti-noise
+//   - Frame confirmation (butuh N frame berturut-turut) anti-flip-flop
+//   - Min hold time di posisi bawah (push-up beneran ada jeda di bawah)
+//   - Bilateral check: kedua sisi tubuh konsisten (bukan goyangan satu tangan)
+//   - Body straightness: badan harus lurus (pinggul gak drop)
+//   - Form jelek = reps TIDAK nambah
 // ============================================================
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
@@ -21,13 +24,19 @@ import {
 export interface Exercise {
   id: string;
   name: string;
-  /** Landmark triplet [joint, middle, joint] used to compute the angle */
+  /** Landmark triplet [joint, middle, joint] untuk angle utama */
   keypoints: [number, number, number];
-  /** Angle saat posisi bawah (tertekuk penuh) */
+  /** Triplet angle kiri [shoulder, elbow, wrist] */
+  leftTriplet: [number, number, number];
+  /** Triplet angle kanan [shoulder, elbow, wrist] */
+  rightTriplet: [number, number, number];
+  /** Triplet straightness badan [hip, shoulder, elbow] */
+  straightTriplet: [number, number, number];
+  /** Angle saat posisi bawah (tertekuk penuh) — strict */
   downAngle: number;
-  /** Angle saat posisi atas (lurus/berdiri) */
+  /** Angle saat posisi atas (lurus/berdiri) — strict */
   upAngle: number;
-  /** Rentang angle yang dianggap form BAGUS saat fase bawah */
+  /** Angle target saat fase bawah */
   targetAngle: number;
   angleTolerance: number;
   /** Plank mode: hitung detik, bukan rep */
@@ -39,34 +48,40 @@ export const EXERCISES: Exercise[] = [
   {
     id: "squat",
     name: "Squat",
-    // hip(23) - knee(25) - ankle(27) → knee angle
     keypoints: [23, 25, 27],
+    leftTriplet: [23, 25, 27],
+    rightTriplet: [24, 26, 28],
+    straightTriplet: [11, 23, 25], // shoulder-hip-knee → badan tegak
     downAngle: 100, // jongkok penuh
-    upAngle: 155, // berdiri tegak
+    upAngle: 160, // berdiri tegak
     targetAngle: 90,
-    angleTolerance: 25, // 65–115 = form bagus
+    angleTolerance: 20, // 70–110 = form bagus
     unit: "squats",
   },
   {
     id: "pushup",
     name: "Push-Up",
-    // shoulder(11) - elbow(13) - wrist(15) → elbow angle
     keypoints: [11, 13, 15],
-    downAngle: 100, // dada dekat lantai
-    upAngle: 150, // lengan lurus
+    leftTriplet: [11, 13, 15],
+    rightTriplet: [12, 14, 16],
+    straightTriplet: [23, 11, 12], // hip kiri - shoulder kiri - shoulder kanan → badan lurus
+    downAngle: 90, // siku tekuk penuh, dada dekat lantai
+    upAngle: 160, // lengan lurus penuh
     targetAngle: 90,
-    angleTolerance: 25, // 65–115 = form bagus
+    angleTolerance: 20, // 70–110 = form bagus
     unit: "push-ups",
   },
   {
     id: "plank",
     name: "Plank",
-    // hip(23) - shoulder(11) - elbow(13) → body straightness
-    keypoints: [23, 11, 13],
+    keypoints: [23, 11, 12], // hip kiri - shoulder kiri - shoulder kanan → badan lurus
+    leftTriplet: [23, 25, 27],
+    rightTriplet: [24, 26, 28],
+    straightTriplet: [23, 11, 12],
     downAngle: 0,
     upAngle: 0,
-    targetAngle: 170,
-    angleTolerance: 15, // 155–185 = badan lurus
+    targetAngle: 180,
+    angleTolerance: 15, // 165–195 = badan lurus
     isHold: true,
     unit: "seconds",
   },
@@ -137,7 +152,13 @@ interface PoseDetectorProps {
   exerciseId?: string;
 }
 
-const REP_COOLDOWN_MS = 600;
+// Guard parameters — biar rep cuma kehitung pas gerakan beneran
+const REQUIRED_FRAMES = 5; // frame berturut-turut untuk konfirmasi transisi
+const MIN_HOLD_MS = 250; // minimal jeda di posisi bawah
+const REP_COOLDOWN_MS = 800; // jeda minimal antar rep
+const EMA_ALPHA = 0.35; // smoothing factor (0-1, makin kecil makin halus)
+const BILATERAL_TOLERANCE = 40; // selisih max angle kiri vs kanan (derajat)
+const STRAIGHT_TOLERANCE = 25; // deviasi max dari badan lurus
 
 export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -159,14 +180,26 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
     let pose: any = null;
     let camera: any = null;
 
-    // refs lokal untuk rep logic (anti stale closure)
+    // refs lokal rep logic (anti stale closure)
     let phase: Phase = "up";
-    let goodDown = false; // pernah gak angle good saat posisi bawah di rep ini
+    let smoothAngle = 0; // EMA smoothed angle
+    let hasSmoothInit = false;
+    let downFrames = 0; // frame berturut-turut di zona bawah
+    let upFrames = 0; // frame berturut-turut di zona atas
+    let downAt = 0; // timestamp saat fase down terkonfirmasi
+    let goodDown = false; // form bagus saat di bawah
     let lastRepAt = 0;
-    let formWarned = false;
-    let plankStart = 0; // timestamp saat plank mulai good
-    let plankAccum = 0; // detik plank terakumulasi
+    let lastFormMsg = "";
+    let plankStart = 0;
+    let plankAccum = 0;
     let lastFrameAt = Date.now();
+
+    const pushMsg = (s: RepState, msg: string) => {
+      if (msg !== lastFormMsg) {
+        lastFormMsg = msg;
+        setState((prev) => ({ ...prev, formMessage: msg }));
+      }
+    };
 
     const load = async () => {
       try {
@@ -219,72 +252,119 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
             const a = lm[aIdx];
             const b = lm[bIdx];
             const c = lm[cIdx];
+            if (!a || !b || !c) return;
 
-            if (a && b && c) {
-              const angle = angleBetween(a, b, c);
+            const rawAngle = angleBetween(a, b, c);
 
-              if (exercise.isHold) {
-                // ----- PLANK: hitung detik selama badan lurus -----
-                const good = Math.abs(angle - exercise.targetAngle) <= exercise.angleTolerance;
-                if (good) {
-                  if (plankStart === 0) plankStart = now;
-                  plankAccum += dt;
-                  const secs = Math.floor(plankAccum);
-                  sessionRepsRef.current = secs;
-                  if (secs !== stateRef.current.repCount) {
-                    setState((s) => ({ ...s, formGood: true, repCount: secs, formMessage: `Keep it straight! ${secs}s` }));
-                  }
-                } else {
-                  if (plankStart !== 0) {
-                    plankStart = 0;
-                    setState((s) => ({ ...s, formGood: false, formMessage: "Hips dropping! Straighten your body" }));
-                    playFormBeep();
-                  }
+            if (exercise.isHold) {
+              // ----- PLANK: hitung detik selama badan lurus -----
+              const good = Math.abs(rawAngle - exercise.targetAngle) <= exercise.angleTolerance;
+              if (good) {
+                if (plankStart === 0) plankStart = now;
+                plankAccum += dt;
+                const secs = Math.floor(plankAccum);
+                sessionRepsRef.current = secs;
+                if (secs !== stateRef.current.repCount) {
+                  setState((s) => ({ ...s, formGood: true, repCount: secs, formMessage: `Keep it straight! ${secs}s` }));
                 }
-                return;
+              } else {
+                if (plankStart !== 0) {
+                  plankStart = 0;
+                  setState((s) => ({ ...s, formGood: false, formMessage: "Hips dropping! Straighten your body" }));
+                  playFormBeep();
+                }
               }
+              return;
+            }
 
-              // ----- PUSH-UP / SQUAT: movement-based rep counting -----
-              const isDown = angle <= exercise.downAngle; // turun penuh
-              const isUp = angle >= exercise.upAngle; // naik penuh
-              const good = Math.abs(angle - exercise.targetAngle) <= exercise.angleTolerance;
+            // ----- PUSH-UP / SQUAT: movement-based rep counting -----
+            // EMA smoothing
+            if (!hasSmoothInit) {
+              smoothAngle = rawAngle;
+              hasSmoothInit = true;
+            } else {
+              smoothAngle = smoothAngle * (1 - EMA_ALPHA) + rawAngle * EMA_ALPHA;
+            }
+            const angle = smoothAngle;
 
-              if (isDown && phase === "up") {
-                // Mulai turun — cek form
-                phase = "down";
-                if (good) {
-                  goodDown = true;
-                  setState((s) => ({ ...s, phase: "down", formGood: true, formMessage: "Good form — push up!" }));
-                } else {
-                  setState((s) => ({ ...s, phase: "down", formGood: false, formMessage: "Too shallow! Full range needed" }));
-                  if (!formWarned) {
-                    formWarned = true;
-                    playFormBeep();
-                  }
-                }
-              } else if (isUp && phase === "down") {
-                // Naik lagi — rep selesai (kalau form bagus & cooldown lewat)
-                phase = "up";
-                const cooldownOk = now - lastRepAt > REP_COOLDOWN_MS;
-                if (goodDown && cooldownOk) {
-                  lastRepAt = now;
-                  sessionRepsRef.current += 1;
-                  setState((s) => {
-                    const next = { ...s, phase: "up" as Phase, repCount: s.repCount + 1, formGood: true, formMessage: "Nice! Keep going 💪" };
-                    return next;
-                  });
-                  playRepBeep();
-                } else if (!goodDown) {
-                  setState((s) => ({ ...s, phase: "up", formGood: false, formMessage: "Rep not counted — full range needed!" }));
-                }
-                goodDown = false;
-                formWarned = false;
-              } else if (isDown && phase === "down") {
-                // Masih di bawah — update form live
-                const g = Math.abs(angle - exercise.targetAngle) <= exercise.angleTolerance;
-                if (g) goodDown = true;
-                setState((s) => ({ ...s, formGood: g, formMessage: g ? "Hold — push up!" : "Adjust: too deep / too shallow" }));
+            // Bilateral check — kedua sisi tubuh harus konsisten
+            const [l1, l2, l3] = exercise.leftTriplet;
+            const [r1, r2, r3] = exercise.rightTriplet;
+            const leftAngle = lm[l1] && lm[l2] && lm[l3] ? angleBetween(lm[l1], lm[l2], lm[l3]) : angle;
+            const rightAngle = lm[r1] && lm[r2] && lm[r3] ? angleBetween(lm[r1], lm[r2], lm[r3]) : angle;
+            const bilateralOk = Math.abs(leftAngle - rightAngle) <= BILATERAL_TOLERANCE;
+
+            // Body straightness — badan harus lurus (hip drop detection)
+            const [s1, s2, s3] = exercise.straightTriplet;
+            const straightAngle =
+              lm[s1] && lm[s2] && lm[s3] ? angleBetween(lm[s1], lm[s2], lm[s3]) : 180;
+            const straightOk = Math.abs(straightAngle - 180) <= STRAIGHT_TOLERANCE;
+
+            const isDown = angle <= exercise.downAngle; // tertekuk penuh
+            const isUp = angle >= exercise.upAngle; // lurus penuh
+            const mainFormOk = Math.abs(angle - exercise.targetAngle) <= exercise.angleTolerance;
+            const formOk = mainFormOk && bilateralOk && straightOk;
+
+            // Frame confirmation counters
+            if (isDown) {
+              downFrames += 1;
+              upFrames = 0;
+            } else if (isUp) {
+              upFrames += 1;
+              downFrames = 0;
+            } else {
+              // Zona tengah — reset kedua counter (anti flip-flop cepat)
+              downFrames = 0;
+              upFrames = 0;
+            }
+
+            if (phase === "up" && downFrames >= REQUIRED_FRAMES) {
+              // Turun terkonfirmasi
+              phase = "down";
+              downAt = now;
+              goodDown = formOk;
+              if (formOk) {
+                setState((s) => ({ ...s, phase: "down", formGood: true, formMessage: "Good — hold & push up!" }));
+              } else {
+                setState((s) => ({ ...s, phase: "down", formGood: false, formMessage: badFormReason(angle, bilateralOk, straightOk) }));
+                playFormBeep();
               }
+            } else if (phase === "down") {
+              // Update form live selama di bawah
+              const heldEnough = now - downAt >= MIN_HOLD_MS;
+              if (heldEnough && formOk) goodDown = true;
+              if (!formOk) {
+                setState((s) => ({ ...s, formGood: false, formMessage: badFormReason(angle, bilateralOk, straightOk) }));
+              } else if (!heldEnough) {
+                setState((s) => ({ ...s, formGood: true, formMessage: "Hold 0.3s at bottom..." }));
+              }
+            }
+
+            if (phase === "down" && upFrames >= REQUIRED_FRAMES && now - downAt >= MIN_HOLD_MS) {
+              // Naik terkonfirmasi — rep selesai kalau form bagus
+              phase = "up";
+              const cooldownOk = now - lastRepAt > REP_COOLDOWN_MS;
+              if (goodDown && formOk && cooldownOk) {
+                lastRepAt = now;
+                sessionRepsRef.current += 1;
+                setState((s) => ({
+                  ...s,
+                  phase: "up",
+                  repCount: s.repCount + 1,
+                  formGood: true,
+                  formMessage: "Nice! Keep going 💪",
+                }));
+                playRepBeep();
+              } else if (goodDown && !formOk) {
+                setState((s) => ({ ...s, phase: "up", formGood: false, formMessage: "Straighten up fully — rep not counted!" }));
+              } else if (!goodDown) {
+                setState((s) => ({ ...s, phase: "up", formGood: false, formMessage: "Rep not counted — full range needed!" }));
+              } else {
+                setState((s) => ({ ...s, phase: "up", formGood: true, formMessage: "Stand by..." }));
+              }
+              goodDown = false;
+              downFrames = 0;
+              upFrames = 0;
             }
           }
           ctx.restore();
@@ -401,4 +481,13 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
       </div>
     </div>
   );
+}
+
+// ---------- Helper: alasan form jelek yang jelas ----------
+function badFormReason(angle: number, bilateralOk: boolean, straightOk: boolean): string {
+  if (!straightOk) return "Body not straight — keep hips up!";
+  if (!bilateralOk) return "Asymmetric! Use both sides evenly";
+  if (angle > 110) return "Too shallow — go deeper!";
+  if (angle < 55) return "Too deep — control the range";
+  return "Fix form first";
 }
