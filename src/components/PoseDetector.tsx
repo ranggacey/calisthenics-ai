@@ -506,14 +506,4 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
 }
 
 
-function badFormReason(angle: number, bilateralOk: boolean, straightOk: boolean): string {
-  if (!straightOk) return "Bad form: Keep your back straight! Don't drop your hips.";
-  if (!bilateralOk) return "Bad form: Both sides must be balanced. Check your left/right alignment.";
-  // If angle is out of typical range, give general angle feedback
-  if (angle < 40) return "Bad form: Go higher. Full range of motion needed!";
-  if (angle > 170) return "Bad form: Go deeper. Full range of motion needed!";
-  return "Bad form: Movement not recognized or form is incorrect.";
-}
 
-
-}
