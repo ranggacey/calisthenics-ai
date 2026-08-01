@@ -327,18 +327,15 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
             const formOk = bilateralOk && straightOk; // form hanya cek bilateral dan straightness
 
             // Form message based on current angle, not rep counting logic
-            if (!bilateralOk) {
-              pushMsg(st, "Asymmetric! Use both sides evenly");
+            if (!formOk) {
+              const msg = badFormReason(exercise, angle, bilateralOk, straightOk);
+              pushMsg(st, msg);
               playFormBeep();
-            } else if (!straightOk) {
-              pushMsg(st, "Keep your back straight!");
-              playFormBeep();
-            } else if (angle > exercise.upAngle) {
-              pushMsg(st, "You are too high up!");
-            } else if (angle < exercise.downAngle) {
-              pushMsg(st, "You are too low!");
+              // Jika form tidak ok, langsung tandai sebagai bad form
+              setState((prev) => ({ ...prev, formGood: false }));
             } else {
               pushMsg(st, "Good form!");
+              setState((prev) => ({ ...prev, formGood: true }));
             }
 
             // Frame confirmation counters
@@ -357,12 +354,12 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
             if (phase === "up" && downFrames >= REQUIRED_FRAMES) {
               // Transisi ke fase "down"
               phase = "down";
-              setState((s) => ({ ...s, phase: "down", formGood: true })); // form good tetap karena rep dihitung
+              setState((s) => ({ ...s, phase: "down" })); // formGood ditangani di atas
             } else if (phase === "down" && upFrames >= REQUIRED_FRAMES) {
               // Transisi ke fase "up" - Rep selesai!
               phase = "up";
               const cooldownOk = now - lastRepAt > REP_COOLDOWN_MS;
-              if (cooldownOk) {
+              if (cooldownOk && formOk) { // Rep hanya terhitung jika form bagus
                 lastRepAt = now;
                 sessionRepsRef.current += 1;
                 setState((s) => ({
@@ -373,6 +370,12 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
                   formMessage: "Nice! Keep going 💪", // reset message ke default
                 }));
                 playRepBeep();
+              } else if (!formOk) {
+                // Jika rep tidak terhitung karena form jelek, berikan feedback
+                const msg = badFormReason(exercise, angle, bilateralOk, straightOk);
+                pushMsg(st, msg);
+                playFormBeep();
+                setState((prev) => ({ ...prev, formGood: false }));
               }
             }
           }
