@@ -1,5 +1,12 @@
 # Evolution Log
 
+## [2026-08-01 02:00] feat: fix broken workout route + live rep counting & session timer
+- Restored `app/components/` (PoseDetector, Achievements, DailyQuest) deleted in restructure commit — `/workout` route was broken (module not found).
+- Added `src/lib/exercises.ts`: exercise definitions (squat/pushup/plank), joint-angle computation from MediaPipe landmarks, hysteresis `RepTracker` state machine for accurate rep counting.
+- Upgraded `PoseDetector.tsx`: emits real-time rep frames (reps, formGood, angle, repCompleted) via callback.
+- Upgraded `app/workout/page.tsx`: exercise selector tabs, live rep counter, session timer, progress bar, form-check warning, completion state.
+- Build + lint pass.
+
 ## Version 0.0.1 - Initial Release
 - Initial deployment with basic pose detection and UI
 

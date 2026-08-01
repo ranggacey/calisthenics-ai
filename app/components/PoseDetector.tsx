@@ -1,14 +1,15 @@
 "use client";
 import React, { useEffect, useRef } from "react";
-import type { LandmarkMap } from "@/lib/exercises";
+import type { ExerciseId, LandmarkMap } from "@/lib/exercises";
 import { RepTracker } from "@/lib/exercises";
 
 interface PoseDetectorProps {
-  exercise: string;
+  exercise: ExerciseId;
   onRep: (frame: {
     reps: number;
     formGood: boolean;
     angle: number | null;
+    repCompleted: boolean;
   }) => void;
 }
 
