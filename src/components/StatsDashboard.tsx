@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 // ============================================================
 // Stats Dashboard — reads workout stats from localStorage
 // ============================================================
-import { loadStats, type WorkoutStats } from "./PoseDetector";
+import { loadStats, type WorkoutStats } from "@/lib/storage";
 
 const STREAK_GOAL = 7;
 const TOTAL_REP_GOAL = 500;

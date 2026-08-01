@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { loadStats, type WorkoutStats } from "./PoseDetector";
+import { loadDailyLog, type DailyLog } from "@/lib/storage";
 
 // ============================================================
-// Daily Quests — refresh every day, auto-track real progress
+// Daily Quests — refresh every day, track TODAY'S reps only.
+// Progress murni dari cali_daily (log harian), bukan all-time.
 // ============================================================
 interface QuestDef {
   id: string;
@@ -11,64 +12,30 @@ interface QuestDef {
   description: string;
   icon: string;
   goal: number;
-  metric: "reps" | "workouts" | "streak";
+  metric: "reps" | "workouts";
+  exercise?: string;
 }
 
 const QUESTS: QuestDef[] = [
-  { id: "q-squat", title: "Squat Day", description: "Do 50 squats today", icon: "🦵", goal: 50, metric: "reps" },
-  { id: "q-pushup", title: "Push-Up Hour", description: "Do 30 push-ups today", icon: "💪", goal: 30, metric: "reps" },
-  { id: "q-plank", title: "Plank Time", description: "1 minute of plank today", icon: "⏱️", goal: 60, metric: "reps" },
+  { id: "q-squat", title: "Squat Day", description: "Do 50 squats today", icon: "🦵", goal: 50, metric: "reps", exercise: "squat" },
+  { id: "q-pushup", title: "Push-Up Hour", description: "Do 30 push-ups today", icon: "💪", goal: 30, metric: "reps", exercise: "pushup" },
+  { id: "q-plank", title: "Plank Time", description: "1 minute of plank today", icon: "⏱️", goal: 60, metric: "reps", exercise: "plank" },
   { id: "q-workout", title: "Show Up", description: "Complete 1 workout today", icon: "🏋️", goal: 1, metric: "workouts" },
 ];
 
-function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-interface DailyLog {
-  date: string;
-  byExercise: Record<string, number>;
-  workouts: number;
-}
-
-function loadDailyLog(): DailyLog {
-  try {
-    const raw = localStorage.getItem("cali_daily");
-    if (!raw) return { date: todayKey(), byExercise: {}, workouts: 0 };
-    const parsed = JSON.parse(raw) as DailyLog;
-    if (parsed.date !== todayKey()) return { date: todayKey(), byExercise: {}, workouts: 0 };
-    return parsed;
-  } catch {
-    return { date: todayKey(), byExercise: {}, workouts: 0 };
-  }
-}
-
 export default function DailyQuests() {
-  const [stats, setStats] = useState<WorkoutStats>(loadStats);
   const [log, setLog] = useState<DailyLog>(loadDailyLog);
 
   useEffect(() => {
-    const refresh = () => {
-      setStats(loadStats());
-      setLog(loadDailyLog());
-    };
+    const refresh = () => setLog(loadDailyLog());
     refresh();
     window.addEventListener("storage", refresh);
     return () => window.removeEventListener("storage", refresh);
   }, []);
 
-  // Merge stats.byExercise into today's log (approximation: all-time by exercise)
-  const merged: Record<string, number> = { ...log.byExercise };
-  Object.entries(stats.byExercise).forEach(([k, v]) => {
-    merged[k] = Math.max(merged[k] ?? 0, v);
-  });
-
   const progressFor = (q: QuestDef): number => {
-    if (q.metric === "workouts") return Math.min(log.workouts + stats.totalWorkouts, q.goal);
-    if (q.metric === "streak") return Math.min(stats.streak, q.goal);
-    if (q.id === "q-squat") return Math.min(merged["squat"] ?? 0, q.goal);
-    if (q.id === "q-pushup") return Math.min(merged["pushup"] ?? 0, q.goal);
-    if (q.id === "q-plank") return Math.min(merged["plank"] ?? 0, q.goal);
+    if (q.metric === "workouts") return Math.min(log.workouts, q.goal);
+    if (q.exercise) return Math.min(log.byExercise[q.exercise] ?? 0, q.goal);
     return 0;
   };
 

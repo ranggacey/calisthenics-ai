@@ -4,6 +4,14 @@
 // Calisthenics AI Trainer — core workout engine (client-side)
 // ============================================================
 import { useEffect, useRef, useState, useCallback } from "react";
+import {
+  loadStats,
+  saveWorkoutSession,
+  logSession,
+  addChallengeReps,
+  addDailyWorkout,
+  type WorkoutStats,
+} from "@/lib/storage";
 
 // ---------- Types ----------
 export interface Exercise {
@@ -112,68 +120,6 @@ function playRepBeep() {
 
 function playFormBeep() {
   beep(220, 160);
-}
-
-// ---------- localStorage helpers ----------
-function readJson<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeJson(key: string, value: unknown) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* storage full — ignore */
-  }
-}
-
-// ---------- Stats storage ----------
-export interface WorkoutStats {
-  totalReps: number;
-  totalWorkouts: number;
-  streak: number;
-  lastWorkoutDate: string | null;
-  bestSet: number;
-  byExercise: Record<string, number>;
-}
-
-const defaultStats: WorkoutStats = {
-  totalReps: 0,
-  totalWorkouts: 0,
-  streak: 0,
-  lastWorkoutDate: null,
-  bestSet: 0,
-  byExercise: {},
-};
-
-export function loadStats(): WorkoutStats {
-  return readJson<WorkoutStats>("cali_stats", defaultStats);
-}
-
-export function saveWorkoutSession(exerciseId: string, reps: number, durationSec: number) {
-  const stats = loadStats();
-  stats.totalReps += reps;
-  stats.totalWorkouts += 1;
-  stats.bestSet = Math.max(stats.bestSet, reps);
-  stats.byExercise[exerciseId] = (stats.byExercise[exerciseId] ?? 0) + reps;
-  const today = new Date().toISOString().slice(0, 10);
-  if (stats.lastWorkoutDate !== today) {
-    if (stats.lastWorkoutDate) {
-      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-      stats.streak = stats.lastWorkoutDate === yesterday ? stats.streak + 1 : 1;
-    } else {
-      stats.streak = 1;
-    }
-    stats.lastWorkoutDate = today;
-  }
-  writeJson("cali_stats", stats);
 }
 
 // ---------- Component ----------
@@ -327,15 +273,11 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
   const finishSession = useCallback(() => {
     if (sessionRepsRef.current > 0) {
       const duration = Math.round((Date.now() - sessionStartRef.current) / 1000);
-      saveWorkoutSession(exercise.id, sessionRepsRef.current, duration);
-      try {
-        const raw = localStorage.getItem("cali_history");
-        const list = raw ? JSON.parse(raw) : [];
-        list.push({ date: new Date().toISOString(), exercise: exercise.id, reps: sessionRepsRef.current, duration });
-        localStorage.setItem("cali_history", JSON.stringify(list.slice(-50)));
-      } catch {
-        /* ignore */
-      }
+      const reps = sessionRepsRef.current;
+      saveWorkoutSession(exercise.id, reps, duration);
+      logSession(exercise.id, reps, duration);
+      addChallengeReps(exercise.id, reps);
+      addDailyWorkout(exercise.id, reps);
       setStats(loadStats());
       setState((s) => ({ ...s, repCount: 0, phase: "ready", formMessage: "Saved! Great work 💪" }));
       sessionRepsRef.current = 0;

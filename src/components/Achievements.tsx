@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { loadStats, type WorkoutStats } from "./PoseDetector";
+import { loadStats, type WorkoutStats } from "@/lib/storage";
 
 // ============================================================
 // Achievements — earned from real workout stats
