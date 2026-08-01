@@ -10,7 +10,7 @@
 //   - Body straightness: badan harus lurus (pinggul gak drop)
 //   - Form jelek = reps TIDAK nambah
 // ============================================================
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
   loadStats,
   saveWorkoutSession,
@@ -86,6 +86,16 @@ export const EXERCISES: Exercise[] = [
     unit: "seconds",
   },
 ];
+
+// Helper untuk ambil exercise berdasarkan ID
+export function getExerciseById(id: string): Exercise {
+  const found = EXERCISES.find((e) => e.id === id);
+  if (!found) {
+    console.warn(`Exercise with ID '${id}' not found. Defaulting to '${EXERCISES[0].id}'.`);
+    return EXERCISES[0];
+  }
+  return found;
+}
 
 // ---------- Rep counting state machine ----------
 type Phase = "up" | "down";

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import PoseDetector from "@/components/PoseDetector";
+import PoseDetector, { getExerciseById } from "@/components/PoseDetector";
 import ExerciseSelector from "@/components/ExerciseSelector";
 import StatsDashboard from "@/components/StatsDashboard";
 import Achievements from "@/components/Achievements";
