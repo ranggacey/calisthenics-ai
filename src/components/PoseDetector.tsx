@@ -157,7 +157,7 @@ function playFormBeep() {
   beep(220, 160);
 }
 
-function badFormReason(angle: number, bilateralOk: boolean, straightOk: boolean): string {
+function badFormReason(exercise: Exercise, angle: number, bilateralOk: boolean, straightOk: boolean): string {
   if (!straightOk) return "Bad form: Keep your back straight!";
   if (!bilateralOk) return "Bad form: Adjust body balance!";
   if (angle > 150) return "Bad form: Go deeper!"; // terlalu tinggi (misal squat kurang dalam)
@@ -348,7 +348,7 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
               if (formOk) {
                 setState((s) => ({ ...s, phase: "down", formGood: true, formMessage: "Good — hold & push up!" }));
               } else {
-                setState((s) => ({ ...s, phase: "down", formGood: false, formMessage: badFormReason(angle, bilateralOk, straightOk) }));
+                setState((s) => ({ ...s, phase: "down", formGood: false, formMessage: badFormReason(exercise, angle, bilateralOk, straightOk) }));
                 playFormBeep();
               }
             } else if (phase === "down") {
@@ -356,7 +356,7 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
               const heldEnough = now - downAt >= MIN_HOLD_MS;
               if (heldEnough && formOk) goodDown = true;
               if (!formOk) {
-                setState((s) => ({ ...s, formGood: false, formMessage: badFormReason(angle, bilateralOk, straightOk) }));
+                setState((s) => ({ ...s, formGood: false, formMessage: badFormReason(exercise, angle, bilateralOk, straightOk) }));
               } else if (!heldEnough) {
                 setState((s) => ({ ...s, formGood: true, formMessage: "Hold 0.3s at bottom..." }));
               }
