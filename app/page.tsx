@@ -1,9 +1,11 @@
 import Link from 'next/link';
-import { seasonalChallenge } from '@/lib/challenges';
+import { seasonalChallenge, getChallengeProgress } from '@/lib/challenges';
 import { badges } from '@/lib/badges';
 import { BadgeCard } from '@/components/ui/BadgeCard';
 
 export default function Home() {
+  const progress = getChallengeProgress(seasonalChallenge);
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gray-900 text-white p-8">
       <header className="text-center mb-12">
@@ -50,6 +52,18 @@ export default function Home() {
           <div className="mt-4 sm:mt-0 text-center sm:text-right">
             <p className="font-semibold">Reward:</p>
             <p className="text-yellow-400 font-bold">{seasonalChallenge.reward}</p>
+          </div>
+        </div>
+        <div className="mt-6">
+          <div className="flex justify-between text-sm text-slate-400 mb-2">
+            <span>Progress: {seasonalChallenge.currentCount} / {seasonalChallenge.goalCount} {seasonalChallenge.unit}</span>
+            <span className="font-bold text-yellow-400">{progress}%</span>
+          </div>
+          <div className="h-4 w-full overflow-hidden rounded-full bg-slate-700">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-amber-400 transition-all"
+              style={{ width: `${progress}%` }}
+            />
           </div>
         </div>
         <p className="mt-6 text-center text-sm text-slate-500">Season ends: {new Date(seasonalChallenge.endDate).toLocaleDateString()}</p>

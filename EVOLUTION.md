@@ -38,7 +38,12 @@
 
 ## Current Status
 
-## [2026-08-01 00:00] chore: plan next feature - Leaderboard enhancements and seasonal challenges
+## [2026-08-01 00:55] feat: enrich leaderboard data, add rank medals & challenge progress bar
+- Expanded leaderboard to 24 athletes with workouts/streak metadata (makes pagination meaningful).
+- Added rank medals (Trophy/Medal) for top 3 + streak/workout detail per row.
+- Mapped badge icons correctly (Dumbbell, Flame, Star) instead of hardcoded Heart.
+- Added progress bar + percentage to Seasonal Challenge card (currentCount/goalCount).
+- Build succeeded.
 ## Version 0.4.0 - Video Generator Integration
 - Added Video Generator AI project with Replicate API integration
 - Implemented video generation API endpoint (/api/generate)

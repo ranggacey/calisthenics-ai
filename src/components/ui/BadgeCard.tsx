@@ -1,13 +1,21 @@
 import { Badge } from '@/lib/badges';
 import { cn } from '@/lib/utils';
-import { Heart } from 'lucide-react';
+import { Dumbbell, Flame, Star } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+const iconMap: Record<string, LucideIcon> = {
+  Dumbbell,
+  Fire: Flame,
+  Star,
+};
 
 export function BadgeCard({ badge }: { badge: Badge }) {
+  const Icon = iconMap[badge.icon] ?? Star;
+
   return (
-    <div className={cn('flex items-center p-4 bg-slate-800 rounded-lg shadow-md')}> 
+    <div className={cn('flex items-center p-4 bg-slate-800 rounded-lg shadow-md')}>
       <div className="p-2 mr-4 bg-slate-700 rounded-full">
-        {/* Map badge.icon to component - placeholder */}
-        <Heart className="w-6 h-6 text-yellow-400" />
+        <Icon className="w-6 h-6 text-yellow-400" />
       </div>
       <div>
         <h3 className="text-lg font-semibold text-white">{badge.name}</h3>
