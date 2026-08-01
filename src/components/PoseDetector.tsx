@@ -236,6 +236,10 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
           lastFrameAt = now;
 
           if (lm && !st.isPaused) {
+            // Yuna debug log
+            // console.log("Angles:", { rawAngle: rawAngle.toFixed(0), smoothAngle: angle.toFixed(0), leftAngle: leftAngle?.toFixed(0), rightAngle: rightAngle?.toFixed(0), straightAngle: straightAngle?.toFixed(0) });
+            // console.log("Form Checks:", { isDown, isUp, mainFormOk, bilateralOk, straightOk });
+
             // Draw skeleton
             drawConnectors(
               ctx,
