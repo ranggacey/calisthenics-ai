@@ -160,8 +160,9 @@ function playFormBeep() {
 function badFormReason(exercise: Exercise, angle: number, bilateralOk: boolean, straightOk: boolean): string {
   if (!straightOk) return "Bad form: Keep your back straight!";
   if (!bilateralOk) return "Bad form: Adjust body balance!";
-  if (angle > 150) return "Bad form: Go deeper!"; // terlalu tinggi (misal squat kurang dalam)
-  if (angle < 80) return "Bad form: Don't go too low!"; // terlalu rendah (misal squat terlalu dalam)
+  if (exercise.isHold) return "Bad form: Maintain straight posture!"; // For plank
+  if (angle > exercise.upAngle + 10) return "Bad form: Go deeper!"; // terlalu tinggi
+  if (angle < exercise.downAngle - 10) return "Bad form: Don't go too low!"; // terlalu rendah
   return "Bad form: Adjust your position!";
 }
 
