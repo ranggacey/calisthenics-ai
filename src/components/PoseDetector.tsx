@@ -497,11 +497,15 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
   );
 }
 
-// ---------- Helper: alasan form jelek yang jelas ----------
+
 function badFormReason(angle: number, bilateralOk: boolean, straightOk: boolean): string {
-  if (!straightOk) return "Body not straight — keep hips up!";
-  if (!bilateralOk) return "Asymmetric! Use both sides evenly";
-  if (angle > 110) return "Too shallow — go deeper!";
-  if (angle < 55) return "Too deep — control the range";
-  return "Fix form first";
+  if (!straightOk) return "Bad form: Keep your back straight! Don't drop your hips.";
+  if (!bilateralOk) return "Bad form: Both sides must be balanced. Check your left/right alignment.";
+  // If angle is out of typical range, give general angle feedback
+  if (angle < 40) return "Bad form: Go higher. Full range of motion needed!";
+  if (angle > 170) return "Bad form: Go deeper. Full range of motion needed!";
+  return "Bad form: Movement not recognized or form is incorrect.";
+}
+
+
 }
