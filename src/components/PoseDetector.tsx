@@ -322,10 +322,24 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
               lm[s1] && lm[s2] && lm[s3] ? angleBetween(lm[s1], lm[s2], lm[s3]) : 180;
             const straightOk = Math.abs(straightAngle - 180) <= STRAIGHT_TOLERANCE;
 
-            const isDown = angle <= exercise.downAngle; // tertekuk penuh
-            const isUp = angle >= exercise.upAngle; // lurus penuh
-            const mainFormOk = Math.abs(angle - exercise.targetAngle) <= exercise.angleTolerance;
-            const formOk = mainFormOk && bilateralOk && straightOk;
+            const isDown = angle <= exercise.downAngle + 10; // tertekuk cukup (lebih forgiving)
+            const isUp = angle >= exercise.upAngle - 10; // lurus cukup (lebih forgiving)
+            const formOk = bilateralOk && straightOk; // form hanya cek bilateral dan straightness
+
+            // Form message based on current angle, not rep counting logic
+            if (!bilateralOk) {
+              pushMsg(st, "Asymmetric! Use both sides evenly");
+              playFormBeep();
+            } else if (!straightOk) {
+              pushMsg(st, "Keep your back straight!");
+              playFormBeep();
+            } else if (angle > exercise.upAngle) {
+              pushMsg(st, "You are too high up!");
+            } else if (angle < exercise.downAngle) {
+              pushMsg(st, "You are too low!");
+            } else {
+              pushMsg(st, "Good form!");
+            }
 
             // Frame confirmation counters
             if (isDown) {
@@ -335,38 +349,20 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
               upFrames += 1;
               downFrames = 0;
             } else {
-              // Zona tengah — reset kedua counter (anti flip-flop cepat)
               downFrames = 0;
               upFrames = 0;
             }
 
+            // State machine for rep counting
             if (phase === "up" && downFrames >= REQUIRED_FRAMES) {
-              // Turun terkonfirmasi
+              // Transisi ke fase "down"
               phase = "down";
-              downAt = now;
-              goodDown = formOk;
-              if (formOk) {
-                setState((s) => ({ ...s, phase: "down", formGood: true, formMessage: "Good — hold & push up!" }));
-              } else {
-                setState((s) => ({ ...s, phase: "down", formGood: false, formMessage: badFormReason(exercise, angle, bilateralOk, straightOk) }));
-                playFormBeep();
-              }
-            } else if (phase === "down") {
-              // Update form live selama di bawah
-              const heldEnough = now - downAt >= MIN_HOLD_MS;
-              if (heldEnough && formOk) goodDown = true;
-              if (!formOk) {
-                setState((s) => ({ ...s, formGood: false, formMessage: badFormReason(exercise, angle, bilateralOk, straightOk) }));
-              } else if (!heldEnough) {
-                setState((s) => ({ ...s, formGood: true, formMessage: "Hold 0.3s at bottom..." }));
-              }
-            }
-
-            if (phase === "down" && upFrames >= REQUIRED_FRAMES && now - downAt >= MIN_HOLD_MS) {
-              // Naik terkonfirmasi — rep selesai kalau form bagus
+              setState((s) => ({ ...s, phase: "down", formGood: true })); // form good tetap karena rep dihitung
+            } else if (phase === "down" && upFrames >= REQUIRED_FRAMES) {
+              // Transisi ke fase "up" - Rep selesai!
               phase = "up";
               const cooldownOk = now - lastRepAt > REP_COOLDOWN_MS;
-              if (goodDown && formOk && cooldownOk) {
+              if (cooldownOk) {
                 lastRepAt = now;
                 sessionRepsRef.current += 1;
                 setState((s) => ({
@@ -374,19 +370,10 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
                   phase: "up",
                   repCount: s.repCount + 1,
                   formGood: true,
-                  formMessage: "Nice! Keep going 💪",
+                  formMessage: "Nice! Keep going 💪", // reset message ke default
                 }));
                 playRepBeep();
-              } else if (goodDown && !formOk) {
-                setState((s) => ({ ...s, phase: "up", formGood: false, formMessage: "Straighten up fully — rep not counted!" }));
-              } else if (!goodDown) {
-                setState((s) => ({ ...s, phase: "up", formGood: false, formMessage: "Rep not counted — full range needed!" }));
-              } else {
-                setState((s) => ({ ...s, phase: "up", formGood: true, formMessage: "Stand by..." }));
               }
-              goodDown = false;
-              downFrames = 0;
-              upFrames = 0;
             }
           }
           ctx.restore();
