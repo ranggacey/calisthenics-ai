@@ -38,6 +38,13 @@
 
 ## Current Status
 
+## [2026-08-01 01:00] feat: leaderboard search
+- Added search input to filter athletes by name.
+- Implemented client-side filtering, pagination updates.
+- UI updated with search field above leaderboard.
+- Build succeeded.
+
+
 ## [2026-08-01 00:55] feat: enrich leaderboard data, add rank medals & challenge progress bar
 - Expanded leaderboard to 24 athletes with workouts/streak metadata (makes pagination meaningful).
 - Added rank medals (Trophy/Medal) for top 3 + streak/workout detail per row.

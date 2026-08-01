@@ -46,16 +46,16 @@ function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number
 
 const LeaderboardPage = () => {
   const [page, setPage] = useState(0);
-  const totalPages = Math.max(0, Math.ceil(leaderboard.length / ENTRIES_PER_PAGE) - 1);
-  const displayed = leaderboard.slice(page * ENTRIES_PER_PAGE, (page + 1) * ENTRIES_PER_PAGE);
+  const [search, setSearch] = useState('');
+  const filtered = leaderboard.filter(entry => entry.name.toLowerCase().includes(search.toLowerCase()));
+  const totalPages = Math.max(0, Math.ceil(filtered.length / ENTRIES_PER_PAGE) - 1);
+  const displayed = filtered.slice(page * ENTRIES_PER_PAGE, (page + 1) * ENTRIES_PER_PAGE);
   const startRank = page * ENTRIES_PER_PAGE + 1;
 
   return (
     <div className="container mx-auto py-8 px-4">
       <h1 className="text-4xl font-bold mb-2">Leaderboard</h1>
-      <p className="text-muted-foreground mb-6">
-        {leaderboard.length} athletes ranked by total points
-      </p>
+      <input type="text" placeholder="Search athletes..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} className="mb-4 p-2 border rounded w-full max-w-sm" />
       <ul className="space-y-3">
         {displayed.map((entry, i) => (
           <LeaderboardRow key={entry.id} entry={entry} rank={startRank + i} />
