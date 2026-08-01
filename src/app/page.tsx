@@ -28,6 +28,10 @@ export default function Home() {
           <h3 className="text-2xl font-bold">Create Workout &rarr;</h3>
           <p className="mt-2 text-slate-400">Design and save your own custom workout routines.</p>
         </Link>
+        <Link href="/dashboard" className="rounded-lg border border-slate-700 bg-slate-800/50 p-6 shadow-lg transition-transform hover:scale-105 hover:bg-slate-800">
+          <h3 className="text-2xl font-bold">Dashboard &rarr;</h3>
+          <p className="mt-2 text-slate-400">See all your stats, challenge progress &amp; history.</p>
+        </Link>
       </section>
 
       <HomeChallenge />

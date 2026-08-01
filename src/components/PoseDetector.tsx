@@ -2,6 +2,10 @@
 
 // ============================================================
 // Calisthenics AI Trainer — core workout engine (client-side)
+// Rep counting berbasis GERAKAN ASLI pengguna:
+//   - Push-Up/Squat: posisi atas → bawah (full range) → atas lagi = 1 rep
+//   - Form jelek (range gerak kurang / angle di luar toleransi) = reps TIDAK nambah
+//   - Plank: hold timer selama badan lurus
 // ============================================================
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
@@ -19,9 +23,15 @@ export interface Exercise {
   name: string;
   /** Landmark triplet [joint, middle, joint] used to compute the angle */
   keypoints: [number, number, number];
+  /** Angle saat posisi bawah (tertekuk penuh) */
+  downAngle: number;
+  /** Angle saat posisi atas (lurus/berdiri) */
+  upAngle: number;
+  /** Rentang angle yang dianggap form BAGUS saat fase bawah */
   targetAngle: number;
   angleTolerance: number;
-  tempo: { down: number; hold: number; up: number };
+  /** Plank mode: hitung detik, bukan rep */
+  isHold?: boolean;
   unit: string;
 }
 
@@ -31,9 +41,10 @@ export const EXERCISES: Exercise[] = [
     name: "Squat",
     // hip(23) - knee(25) - ankle(27) → knee angle
     keypoints: [23, 25, 27],
+    downAngle: 100, // jongkok penuh
+    upAngle: 155, // berdiri tegak
     targetAngle: 90,
-    angleTolerance: 20,
-    tempo: { down: 3, hold: 1, up: 1 },
+    angleTolerance: 25, // 65–115 = form bagus
     unit: "squats",
   },
   {
@@ -41,9 +52,10 @@ export const EXERCISES: Exercise[] = [
     name: "Push-Up",
     // shoulder(11) - elbow(13) - wrist(15) → elbow angle
     keypoints: [11, 13, 15],
+    downAngle: 100, // dada dekat lantai
+    upAngle: 150, // lengan lurus
     targetAngle: 90,
-    angleTolerance: 25,
-    tempo: { down: 2, hold: 1, up: 2 },
+    angleTolerance: 25, // 65–115 = form bagus
     unit: "push-ups",
   },
   {
@@ -51,33 +63,31 @@ export const EXERCISES: Exercise[] = [
     name: "Plank",
     // hip(23) - shoulder(11) - elbow(13) → body straightness
     keypoints: [23, 11, 13],
+    downAngle: 0,
+    upAngle: 0,
     targetAngle: 170,
-    angleTolerance: 15,
-    tempo: { down: 0, hold: 60, up: 0 },
+    angleTolerance: 15, // 155–185 = badan lurus
+    isHold: true,
     unit: "seconds",
   },
 ];
 
 // ---------- Rep counting state machine ----------
-type Phase = "up" | "down" | "hold" | "ready";
+type Phase = "up" | "down";
 
 export interface RepState {
   phase: Phase;
   repCount: number;
-  lastRepTime: number;
   formGood: boolean;
   formMessage: string;
-  setIndex: number;
   isPaused: boolean;
 }
 
 const initialState: RepState = {
-  phase: "ready",
+  phase: "up",
   repCount: 0,
-  lastRepTime: 0,
   formGood: true,
   formMessage: "Stand by...",
-  setIndex: 0,
   isPaused: false,
 };
 
@@ -127,6 +137,8 @@ interface PoseDetectorProps {
   exerciseId?: string;
 }
 
+const REP_COOLDOWN_MS = 600;
+
 export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -141,13 +153,20 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
   const sessionRepsRef = useRef(0);
   const sessionStartRef = useRef(Date.now());
 
-  // --- main loop: MediaPipe pose + rep logic ---
+  // --- main loop: MediaPipe pose + movement-based rep logic ---
   useEffect(() => {
     let disposed = false;
     let pose: any = null;
     let camera: any = null;
-    let phaseStart = 0;
+
+    // refs lokal untuk rep logic (anti stale closure)
+    let phase: Phase = "up";
+    let goodDown = false; // pernah gak angle good saat posisi bawah di rep ini
+    let lastRepAt = 0;
     let formWarned = false;
+    let plankStart = 0; // timestamp saat plank mulai good
+    let plankAccum = 0; // detik plank terakumulasi
+    let lastFrameAt = Date.now();
 
     const load = async () => {
       try {
@@ -179,6 +198,9 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
 
           const lm = results.poseLandmarks;
           const st = current();
+          const now = Date.now();
+          const dt = (now - lastFrameAt) / 1000;
+          lastFrameAt = now;
 
           if (lm && !st.isPaused) {
             // Draw skeleton
@@ -193,50 +215,75 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
             );
             drawLandmarks(ctx, lm, { color: "#ef4444", lineWidth: 2, radius: 4 });
 
-            // Form check via angle
             const [aIdx, bIdx, cIdx] = exercise.keypoints;
             const a = lm[aIdx];
             const b = lm[bIdx];
             const c = lm[cIdx];
+
             if (a && b && c) {
               const angle = angleBetween(a, b, c);
-              const dev = Math.abs(angle - exercise.targetAngle);
-              const good = dev <= exercise.angleTolerance;
-              if (good) {
-                formWarned = false;
-              } else if (!formWarned) {
-                formWarned = true;
-                playFormBeep();
+
+              if (exercise.isHold) {
+                // ----- PLANK: hitung detik selama badan lurus -----
+                const good = Math.abs(angle - exercise.targetAngle) <= exercise.angleTolerance;
+                if (good) {
+                  if (plankStart === 0) plankStart = now;
+                  plankAccum += dt;
+                  const secs = Math.floor(plankAccum);
+                  sessionRepsRef.current = secs;
+                  if (secs !== stateRef.current.repCount) {
+                    setState((s) => ({ ...s, formGood: true, repCount: secs, formMessage: `Keep it straight! ${secs}s` }));
+                  }
+                } else {
+                  if (plankStart !== 0) {
+                    plankStart = 0;
+                    setState((s) => ({ ...s, formGood: false, formMessage: "Hips dropping! Straighten your body" }));
+                    playFormBeep();
+                  }
+                }
+                return;
               }
 
-              // Tempo state machine
-              const now = Date.now();
-              const elapsed = now - phaseStart;
+              // ----- PUSH-UP / SQUAT: movement-based rep counting -----
+              const isDown = angle <= exercise.downAngle; // turun penuh
+              const isUp = angle >= exercise.upAngle; // naik penuh
+              const good = Math.abs(angle - exercise.targetAngle) <= exercise.angleTolerance;
 
-              if (st.phase === "ready") {
-                phaseStart = now;
-                setState((s) => ({ ...s, phase: "down", formMessage: good ? "Go down!" : "Fix form first", formGood: good }));
-              } else if (st.phase === "down") {
-                if (exercise.tempo.down > 0 && elapsed >= exercise.tempo.down * 1000) {
-                  phaseStart = now;
-                  setState((s) => ({ ...s, phase: "hold", formMessage: "Hold!", formGood: good }));
+              if (isDown && phase === "up") {
+                // Mulai turun — cek form
+                phase = "down";
+                if (good) {
+                  goodDown = true;
+                  setState((s) => ({ ...s, phase: "down", formGood: true, formMessage: "Good form — push up!" }));
+                } else {
+                  setState((s) => ({ ...s, phase: "down", formGood: false, formMessage: "Too shallow! Full range needed" }));
+                  if (!formWarned) {
+                    formWarned = true;
+                    playFormBeep();
+                  }
                 }
-              } else if (st.phase === "hold") {
-                if (exercise.tempo.hold > 0 && elapsed >= exercise.tempo.hold * 1000) {
-                  phaseStart = now;
-                  setState((s) => ({ ...s, phase: "up", formMessage: "Push up!", formGood: good }));
-                }
-              } else if (st.phase === "up") {
-                if (exercise.tempo.up > 0 && elapsed >= exercise.tempo.up * 1000) {
-                  // Rep complete!
-                  phaseStart = now;
+              } else if (isUp && phase === "down") {
+                // Naik lagi — rep selesai (kalau form bagus & cooldown lewat)
+                phase = "up";
+                const cooldownOk = now - lastRepAt > REP_COOLDOWN_MS;
+                if (goodDown && cooldownOk) {
+                  lastRepAt = now;
+                  sessionRepsRef.current += 1;
                   setState((s) => {
-                    const next = { ...s, phase: "ready" as Phase, repCount: s.repCount + 1, lastRepTime: now, formMessage: "Nice! Next rep" };
-                    sessionRepsRef.current = next.repCount;
+                    const next = { ...s, phase: "up" as Phase, repCount: s.repCount + 1, formGood: true, formMessage: "Nice! Keep going 💪" };
                     return next;
                   });
                   playRepBeep();
+                } else if (!goodDown) {
+                  setState((s) => ({ ...s, phase: "up", formGood: false, formMessage: "Rep not counted — full range needed!" }));
                 }
+                goodDown = false;
+                formWarned = false;
+              } else if (isDown && phase === "down") {
+                // Masih di bawah — update form live
+                const g = Math.abs(angle - exercise.targetAngle) <= exercise.angleTolerance;
+                if (g) goodDown = true;
+                setState((s) => ({ ...s, formGood: g, formMessage: g ? "Hold — push up!" : "Adjust: too deep / too shallow" }));
               }
             }
           }
@@ -279,7 +326,7 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
       addChallengeReps(exercise.id, reps);
       addDailyWorkout(exercise.id, reps);
       setStats(loadStats());
-      setState((s) => ({ ...s, repCount: 0, phase: "ready", formMessage: "Saved! Great work 💪" }));
+      setState((s) => ({ ...s, repCount: 0, phase: "up", formMessage: "Saved! Great work 💪" }));
       sessionRepsRef.current = 0;
       sessionStartRef.current = Date.now();
     }
@@ -290,7 +337,7 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
   };
 
   const resetSession = () => {
-    setState((s) => ({ ...s, repCount: 0, phase: "ready", formMessage: "Stand by...", setIndex: 0 }));
+    setState((s) => ({ ...s, repCount: 0, phase: "up", formMessage: "Stand by..." }));
     sessionRepsRef.current = 0;
     sessionStartRef.current = Date.now();
   };
@@ -309,14 +356,14 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
           {exercise.name}
         </div>
         <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-black/60 text-white text-sm font-mono">
-          Reps: {state.repCount}
+          {exercise.isHold ? `Time: ${state.repCount}s` : `Reps: ${state.repCount}`}
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-3 w-full max-w-[640px] text-center">
         <div className="rounded-lg bg-slate-800 p-3">
-          <p className="text-xs uppercase text-slate-400">Phase</p>
-          <p className="text-xl font-bold text-white">{state.phase}</p>
+          <p className="text-xs uppercase text-slate-400">Position</p>
+          <p className="text-xl font-bold text-white">{state.phase === "up" ? "UP" : "DOWN"}</p>
         </div>
         <div className="rounded-lg bg-slate-800 p-3">
           <p className="text-xs uppercase text-slate-400">Form</p>
@@ -325,8 +372,8 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
           </p>
         </div>
         <div className="rounded-lg bg-slate-800 p-3">
-          <p className="text-xs uppercase text-slate-400">Set</p>
-          <p className="text-xl font-bold text-white">{state.setIndex + 1}</p>
+          <p className="text-xs uppercase text-slate-400">Count</p>
+          <p className="text-xl font-bold text-white">{state.repCount}</p>
         </div>
       </div>
 

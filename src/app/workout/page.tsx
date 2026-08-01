@@ -11,6 +11,7 @@ import WorkoutHistory from "@/components/WorkoutHistory";
 import WeeklyActivity from "@/components/WeeklyActivity";
 import MotivationalQuote from "@/components/MotivationalQuote";
 import SoundToggle from "@/components/SoundToggle";
+import Link from "next/link";
 
 export default function WorkoutPage() {
   const [exercise, setExercise] = useState("squat");
@@ -44,6 +45,14 @@ export default function WorkoutPage() {
             <MotivationalQuote />
             <div className="flex justify-center">
               <SoundToggle />
+            </div>
+            <div className="flex justify-center">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold border border-slate-700"
+              >
+                📊 Full Dashboard
+              </Link>
             </div>
           </aside>
         </div>
