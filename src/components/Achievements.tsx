@@ -31,11 +31,22 @@ export default function Achievements() {
   useEffect(() => {
     const onStorage = () => setStats(loadStats());
     window.addEventListener("storage", onStorage);
-    const ids = ACHIEVEMENTS.filter((a) => a.check(stats)).map((a) => a.id);
-    setEarned(ids);
-    const prev = localStorage.getItem("cali_achievements");
-    if (prev !== JSON.stringify(ids)) localStorage.setItem("cali_achievements", JSON.stringify(ids));
-    return () => window.removeEventListener("storage", onStorage);
+
+    const updateAchievements = () => {
+      const ids = ACHIEVEMENTS.filter((a) => a.check(stats)).map((a) => a.id);
+      setEarned((prevEarned) => {
+        if (JSON.stringify(prevEarned.sort()) !== JSON.stringify(ids.sort())) {
+          return ids;
+        }
+        return prevEarned;
+      });
+      const prev = localStorage.getItem("cali_achievements");
+      if (prev !== JSON.stringify(ids)) localStorage.setItem("cali_achievements", JSON.stringify(ids));
+    };
+
+    updateAchievements(); // Panggil saat mount
+    window.addEventListener("storage", updateAchievements); // Panggil saat storage berubah
+    return () => window.removeEventListener("storage", updateAchievements);
   }, [stats]);
 
   const earnedCount = earned.length;

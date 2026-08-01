@@ -184,19 +184,24 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
   const [state, setState] = useState<RepState>(initialState);
   const [stats, setStats] = useState<WorkoutStats>(loadStats);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const stateRef = useRef(state);
-  stateRef.current = state;
+  const stateRef = useRef<RepState>(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const exercise = EXERCISES.find((e) => e.id === exerciseId) ?? EXERCISES[0];
 
   const sessionRepsRef = useRef(0);
-  const sessionStartRef = useRef(Date.now());
+  const sessionStartRef = useRef(0);
+  useEffect(() => {
+    sessionStartRef.current = Date.now();
+  }, []);
 
   // --- main loop: MediaPipe pose + movement-based rep logic ---
   useEffect(() => {
     let disposed = false;
-    let pose: any = null;
-    let camera: any = null;
+    let pose: import("@mediapipe/pose").Pose | null = null;
+    let camera: import("@mediapipe/camera_utils").Camera | null = null;
 
     // refs lokal rep logic (anti stale closure)
     let phase: Phase = "up";
@@ -204,8 +209,7 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
     let hasSmoothInit = false;
     let downFrames = 0; // frame berturut-turut di zona bawah
     let upFrames = 0; // frame berturut-turut di zona atas
-    let downAt = 0; // timestamp saat fase down terkonfirmasi
-    let goodDown = false; // form bagus saat di bawah
+
     let lastRepAt = 0;
     let lastFormMsg = "";
     let plankStart = 0;
@@ -239,7 +243,7 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
 
         const current = () => stateRef.current;
 
-        pose.onResults((results: any) => {
+        pose.onResults((results: import("@mediapipe/pose").Results) => {
           if (disposed) return;
           const ctx = canvas.getContext("2d");
           if (!ctx) return;
@@ -390,9 +394,15 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
           height: 480,
         });
         await camera.start();
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!disposed) {
-          setCameraError(err?.message ?? "Camera failed to start. Check permissions.");
+          let errorMessage = "Unknown camera error. Check permissions.";
+          if (err instanceof Error) {
+            errorMessage = err.message;
+          } else if (typeof err === "string") {
+            errorMessage = err;
+          }
+          setCameraError(errorMessage);
         }
       }
     };

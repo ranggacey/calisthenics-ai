@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -37,7 +38,7 @@ export default function RootLayout({
         {/* Navbar dengan logo CDN */}
         <nav className="w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-50">
           <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            <a href="/" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4aa.png"
@@ -47,17 +48,17 @@ export default function RootLayout({
               <span className="font-black text-lg tracking-tight text-white">
                 Calisthenics AI
               </span>
-            </a>
+            </Link>
             <div className="flex items-center gap-4 text-sm font-medium">
-              <a href="/workout" className="text-slate-300 hover:text-white transition-colors">
+              <Link href="/workout" className="text-slate-300 hover:text-white transition-colors">
                 Workout
-              </a>
-              <a href="/leaderboard" className="text-slate-300 hover:text-white transition-colors">
+              </Link>
+              <Link href="/leaderboard" className="text-slate-300 hover:text-white transition-colors">
                 Leaderboard
-              </a>
-              <a href="/create-workout" className="text-slate-300 hover:text-white transition-colors">
+              </Link>
+              <Link href="/create-workout" className="text-slate-300 hover:text-white transition-colors">
                 Create
-              </a>
+              </Link>
             </div>
           </div>
         </nav>
