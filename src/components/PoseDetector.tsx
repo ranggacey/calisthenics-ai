@@ -388,7 +388,9 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
 
         camera = new Camera(video, {
           onFrame: async () => {
-            await pose.send({ image: video });
+            if (pose) {
+              await pose.send({ image: video });
+            }
           },
           width: 640,
           height: 480,
