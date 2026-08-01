@@ -157,6 +157,14 @@ function playFormBeep() {
   beep(220, 160);
 }
 
+function badFormReason(angle: number, bilateralOk: boolean, straightOk: boolean): string {
+  if (!straightOk) return "Bad form: Keep your back straight!";
+  if (!bilateralOk) return "Bad form: Adjust body balance!";
+  if (angle > 150) return "Bad form: Go deeper!"; // terlalu tinggi (misal squat kurang dalam)
+  if (angle < 80) return "Bad form: Don't go too low!"; // terlalu rendah (misal squat terlalu dalam)
+  return "Bad form: Adjust your position!";
+}
+
 // ---------- Component ----------
 interface PoseDetectorProps {
   exerciseId?: string;
