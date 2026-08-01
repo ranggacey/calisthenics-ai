@@ -337,11 +337,15 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
               pushMsg(st, msg);
               playFormBeep();
               // Jika form tidak ok, langsung tandai sebagai bad form
-              setState((prev) => ({ ...prev, formGood: false }));
+              setState((prev) => ({ ...prev, formGood: false, formMessage: msg }));
             } else {
+              // Jika form kembali baik, hapus pesan error spesifik dan reset ke "Good form!"
               pushMsg(st, "Good form!");
               setState((prev) => ({ ...prev, formGood: true }));
             }
+
+            // Rep hanya terhitung jika form OK DAN berada di rentang sudut yang benar (angle Ok)
+            const angleOk = Math.abs(angle - exercise.targetAngle) <= exercise.angleTolerance;
 
             // Frame confirmation counters
             if (isDown) {
@@ -364,7 +368,7 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
               // Transisi ke fase "up" - Rep selesai!
               phase = "up";
               const cooldownOk = now - lastRepAt > REP_COOLDOWN_MS;
-              if (cooldownOk && formOk) { // Rep hanya terhitung jika form bagus
+              if (cooldownOk && formOk && angleOk) { // Rep hanya terhitung jika form bagus dan sudutnya pas
                 lastRepAt = now;
                 sessionRepsRef.current += 1;
                 setState((s) => ({
