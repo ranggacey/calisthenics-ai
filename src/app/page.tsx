@@ -1,7 +1,7 @@
-import Link from 'next/link';
-import { seasonalChallenge, getChallengeProgress } from '@/lib/challenges';
-import { badges } from '@/lib/badges';
-import { BadgeCard } from '@/components/ui/BadgeCard';
+import Link from "next/link";
+import { seasonalChallenge, getChallengeProgress } from "@/lib/challenges";
+import { badges } from "@/lib/badges";
+import { BadgeCard } from "@/components/ui/BadgeCard";
 
 export default function Home() {
   const progress = getChallengeProgress(seasonalChallenge);
@@ -16,25 +16,19 @@ export default function Home() {
           Your personal AI-powered calisthenics coach.
         </p>
       </header>
-      
+
       <section className="grid w-full max-w-5xl grid-cols-1 gap-6 md:grid-cols-3 mb-12">
         <Link href="/workout" className="rounded-lg border border-slate-700 bg-slate-800/50 p-6 shadow-lg transition-transform hover:scale-105 hover:bg-slate-800">
           <h3 className="text-2xl font-bold">Start Workout &rarr;</h3>
-          <p className="mt-2 text-slate-400">
-            Begin a new workout session with real-time feedback.
-          </p>
+          <p className="mt-2 text-slate-400">Begin a new workout session with real-time feedback.</p>
         </Link>
         <Link href="/leaderboard" className="rounded-lg border border-slate-700 bg-slate-800/50 p-6 shadow-lg transition-transform hover:scale-105 hover:bg-slate-800">
           <h3 className="text-2xl font-bold">Leaderboard &rarr;</h3>
-          <p className="mt-2 text-slate-400">
-            See how you rank against other users.
-          </p>
+          <p className="mt-2 text-slate-400">See how you rank against other users.</p>
         </Link>
         <Link href="/create-workout" className="rounded-lg border border-slate-700 bg-slate-800/50 p-6 shadow-lg transition-transform hover:scale-105 hover:bg-slate-800">
           <h3 className="text-2xl font-bold">Create Workout &rarr;</h3>
-          <p className="mt-2 text-slate-400">
-            Design and save your own custom workout routines.
-          </p>
+          <p className="mt-2 text-slate-400">Design and save your own custom workout routines.</p>
         </Link>
       </section>
 
@@ -60,10 +54,7 @@ export default function Home() {
             <span className="font-bold text-yellow-400">{progress}%</span>
           </div>
           <div className="h-4 w-full overflow-hidden rounded-full bg-slate-700">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-amber-400 transition-all"
-              style={{ width: `${progress}%` }}
-            />
+            <div className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-amber-400 transition-all" style={{ width: `${progress}%` }} />
           </div>
         </div>
         <p className="mt-6 text-center text-sm text-slate-500">Season ends: {new Date(seasonalChallenge.endDate).toLocaleDateString()}</p>
