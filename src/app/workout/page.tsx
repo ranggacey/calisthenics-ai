@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import PoseDetector, { getExerciseById } from "@/components/PoseDetector";
+import { useState } from "react";
+import PoseDetector from "@/components/PoseDetector";
 import ExerciseSelector from "@/components/ExerciseSelector";
 import StatsDashboard from "@/components/StatsDashboard";
 import Achievements from "@/components/Achievements";
@@ -10,7 +10,9 @@ import ChallengeTracker from "@/components/ChallengeTracker";
 import WorkoutHistory from "@/components/WorkoutHistory";
 import WeeklyActivity from "@/components/WeeklyActivity";
 import MotivationalQuote from "@/components/MotivationalQuote";
+import RestTimer from "@/components/RestTimer";
 import SoundToggle from "@/components/SoundToggle";
+import HapticToggle from "@/components/HapticToggle";
 import Link from "next/link";
 
 export default function WorkoutPage() {
@@ -36,16 +38,20 @@ export default function WorkoutPage() {
 
           {/* Sidebar */}
           <aside className="space-y-6">
-            <div className="rounded-2xl bg-slate-900/80 border border-slate-700 p-6">
-              <SessionTimer />
-            </div>
-            <StatsDashboard />
-            <WeeklyActivity />
-            <WorkoutHistory />
-            <MotivationalQuote />
-            <div className="flex justify-center">
-              <SoundToggle />
-            </div>
+                      <div className="rounded-2xl bg-slate-900/80 border border-slate-700 p-6">
+                        <SessionTimer />
+                      </div>
+                      <RestTimer />
+                      <StatsDashboard />
+                      <WeeklyActivity />
+                      <WorkoutHistory />
+                      <MotivationalQuote />
+                      <div className="flex justify-center">
+                        <SoundToggle />
+                      </div>
+                      <div className="flex justify-center">
+                        <HapticToggle />
+                      </div>
             <div className="flex justify-center">
               <Link
                 href="/dashboard"

@@ -10,14 +10,12 @@
 //   - Body straightness: badan harus lurus (pinggul gak drop)
 //   - Form jelek = reps TIDAK nambah
 // ============================================================
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
-  loadStats,
   saveWorkoutSession,
   logSession,
   addChallengeReps,
   addDailyWorkout,
-  type WorkoutStats,
 } from "@/lib/storage";
 
 // ---------- Types ----------
@@ -85,6 +83,71 @@ export const EXERCISES: Exercise[] = [
     isHold: true,
     unit: "seconds",
   },
+  {
+    id: "pullup",
+    name: "Pull-Up",
+    keypoints: [11, 13, 15], // shoulder-elbow-wrist (left arm)
+    leftTriplet: [11, 13, 15],
+    rightTriplet: [12, 14, 16],
+    straightTriplet: [23, 11, 12], // hip-shoulder-shoulder → body straight
+    downAngle: 160, // arms extended (hanging)
+    upAngle: 60, // chin over bar
+    targetAngle: 90,
+    angleTolerance: 25,
+    unit: "pull-ups",
+  },
+  {
+    id: "dips",
+    name: "Dips",
+    keypoints: [11, 13, 15], // shoulder-elbow-wrist (left arm)
+    leftTriplet: [11, 13, 15],
+    rightTriplet: [12, 14, 16],
+    straightTriplet: [23, 11, 12], // hip-shoulder-shoulder → body straight
+    downAngle: 90, // elbows at 90°
+    upAngle: 160, // arms extended
+    targetAngle: 90,
+    angleTolerance: 20,
+    unit: "dips",
+  },
+  {
+    id: "lunges",
+    name: "Lunges",
+    keypoints: [23, 25, 27], // hip-knee-ankle (left leg)
+    leftTriplet: [23, 25, 27],
+    rightTriplet: [24, 26, 28],
+    straightTriplet: [11, 23, 25], // shoulder-hip-knee → torso upright
+    downAngle: 90, // knee at 90°
+    upAngle: 160, // standing
+    targetAngle: 90,
+    angleTolerance: 20,
+    unit: "lunges",
+  },
+  {
+    id: "crunch",
+    name: "Crunch",
+    keypoints: [11, 23, 25], // shoulder-hip-knee (torso angle)
+    leftTriplet: [11, 13, 15],
+    rightTriplet: [12, 14, 16],
+    straightTriplet: [11, 23, 25], // shoulder-hip-knee → spine alignment
+    downAngle: 160, // lying flat
+    upAngle: 60, // crunched up
+    targetAngle: 90,
+    angleTolerance: 25,
+    unit: "crunches",
+  },
+  {
+    id: "burpee",
+    name: "Burpee",
+    keypoints: [11, 13, 15], // using pushup phase for rep counting
+    leftTriplet: [11, 13, 15],
+    rightTriplet: [12, 14, 16],
+    straightTriplet: [23, 11, 12], // body straight during pushup
+    downAngle: 90, // pushup bottom
+    upAngle: 160, // standing/jump top
+    targetAngle: 90,
+    angleTolerance: 30,
+    unit: "burpees",
+  },
 ];
 
 // Helper untuk ambil exercise berdasarkan ID
@@ -130,7 +193,7 @@ function angleBetween(a: { x: number; y: number }, b: { x: number; y: number }, 
 // ---------- Audio feedback (Web Audio API) ----------
 let audioCtx: AudioContext | null = null;
 
-function beep(freq: number, durationMs = 80) {
+function beep(freq: number, durationMs = 80, type: OscillatorType = "square") {
   try {
     if (typeof window === "undefined") return;
     if (localStorage.getItem("cali_sound") === "off") return;
@@ -138,7 +201,7 @@ function beep(freq: number, durationMs = 80) {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.frequency.value = freq;
-    osc.type = "square";
+    osc.type = type;
     gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + durationMs / 1000);
     osc.connect(gain).connect(audioCtx.destination);
@@ -149,20 +212,63 @@ function beep(freq: number, durationMs = 80) {
   }
 }
 
+// ---------- Haptic feedback (Vibration API) ----------
+function vibrate(pattern: number | number[]) {
+  try {
+    if (typeof window === "undefined") return;
+    if (localStorage.getItem("cali_haptic") === "off") return;
+    if ("vibrate" in navigator) {
+      navigator.vibrate(pattern);
+    }
+  } catch {
+    /* vibration blocked — ignore */
+  }
+}
+
 function playRepBeep() {
-  beep(880);
+  beep(880, 100, "sine");
+  vibrate(50);
 }
 
 function playFormBeep() {
-  beep(220, 160);
+  beep(220, 160, "sawtooth");
+  vibrate([30, 20, 30]);
 }
 
-function badFormReason(exercise: Exercise, angle: number, bilateralOk: boolean, straightOk: boolean): string {
+function playPhaseBeep() {
+  beep(440, 80, "triangle");
+  vibrate(30);
+}
+
+type FormPhase = "up" | "down" | "hold";
+
+function badFormReason(
+  exercise: Exercise,
+  angle: number,
+  bilateralOk: boolean,
+  straightOk: boolean,
+  phase: FormPhase = "up"
+): string {
   if (!straightOk) return "Bad form: Keep your back straight!";
   if (!bilateralOk) return "Bad form: Adjust body balance!";
-  if (exercise.isHold) return "Bad form: Maintain straight posture!"; // For plank
-  if (angle > exercise.upAngle + 10) return "Bad form: Go deeper!"; // terlalu tinggi
-  if (angle < exercise.downAngle - 10) return "Bad form: Don't go too low!"; // terlalu rendah
+  if (exercise.isHold) return "Bad form: Maintain straight posture!";
+
+  // Contextual feedback based on current phase
+  if (phase === "down") {
+    // User is in down phase - check if they went deep enough
+    if (angle > exercise.targetAngle + exercise.angleTolerance) {
+      return "Bad form: Go deeper!";
+    }
+    if (angle < exercise.downAngle - 10) {
+      return "Bad form: Don't go too low!";
+    }
+  } else if (phase === "up") {
+    // User is in up phase - check if they extended fully
+    if (angle < exercise.upAngle - 15) {
+      return "Bad form: Extend fully at the top!";
+    }
+  }
+
   return "Bad form: Adjust your position!";
 }
 
@@ -173,7 +279,6 @@ interface PoseDetectorProps {
 
 // Guard parameters — biar rep cuma kehitung pas gerakan beneran
 const REQUIRED_FRAMES = 5; // frame berturut-turut untuk konfirmasi transisi
-const MIN_HOLD_MS = 250; // minimal jeda di posisi bawah
 const REP_COOLDOWN_MS = 800; // jeda minimal antar rep
 const EMA_ALPHA = 0.35; // smoothing factor (0-1, makin kecil makin halus)
 const BILATERAL_TOLERANCE = 40; // selisih max angle kiri vs kanan (derajat)
@@ -183,8 +288,9 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState<RepState>(initialState);
-  const [stats, setStats] = useState<WorkoutStats>(loadStats);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [showSummary, setShowSummary] = useState(false);
+  const [lastSession, setLastSession] = useState<{ reps: number; duration: number; exercise: string } | null>(null);
   const stateRef = useRef<RepState>(state);
   useEffect(() => {
     stateRef.current = state;
@@ -216,6 +322,7 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
     let plankStart = 0;
     let plankAccum = 0;
     let lastFrameAt = Date.now();
+    let reachedBottom = false; // Track if user reached proper bottom position
 
     const pushMsg = (s: RepState, msg: string) => {
       if (msg !== lastFormMsg) {
@@ -332,8 +439,9 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
             const formOk = bilateralOk && straightOk; // form hanya cek bilateral dan straightness
 
             // Form message based on current angle, not rep counting logic
+            const currentPhase = phase === "down" ? "down" : "up";
             if (!formOk) {
-              const msg = badFormReason(exercise, angle, bilateralOk, straightOk);
+              const msg = badFormReason(exercise, angle, bilateralOk, straightOk, currentPhase);
               pushMsg(st, msg);
               playFormBeep();
               // Jika form tidak ok, langsung tandai sebagai bad form
@@ -344,8 +452,11 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
               setState((prev) => ({ ...prev, formGood: true }));
             }
 
-            // Rep hanya terhitung jika form OK DAN berada di rentang sudut yang benar (angle Ok)
-            const angleOk = Math.abs(angle - exercise.targetAngle) <= exercise.angleTolerance;
+            // Track if user reached proper bottom position during down phase
+            const inTargetRange = Math.abs(angle - exercise.targetAngle) <= exercise.angleTolerance;
+            if (phase === "down" && isDown && inTargetRange) {
+              reachedBottom = true;
+            }
 
             // Frame confirmation counters
             if (isDown) {
@@ -363,13 +474,17 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
             if (phase === "up" && downFrames >= REQUIRED_FRAMES) {
               // Transisi ke fase "down"
               phase = "down";
+              reachedBottom = false; // Reset for new rep
               setState((s) => ({ ...s, phase: "down" })); // formGood ditangani di atas
+              playPhaseBeep(); // Audio/haptic cue for phase transition
             } else if (phase === "down" && upFrames >= REQUIRED_FRAMES) {
               // Transisi ke fase "up" - Rep selesai!
               phase = "up";
               const cooldownOk = now - lastRepAt > REP_COOLDOWN_MS;
-              if (cooldownOk && formOk && angleOk) { // Rep hanya terhitung jika form bagus dan sudutnya pas
+              // Rep hanya terhitung jika form bagus DAN user sudah mencapai posisi bawah yang benar
+              if (cooldownOk && formOk && reachedBottom) {
                 lastRepAt = now;
+                reachedBottom = false; // Reset for next rep
                 sessionRepsRef.current += 1;
                 setState((s) => ({
                   ...s,
@@ -381,10 +496,16 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
                 playRepBeep();
               } else if (!formOk) {
                 // Jika rep tidak terhitung karena form jelek, berikan feedback
-                const msg = badFormReason(exercise, angle, bilateralOk, straightOk);
+                const msg = badFormReason(exercise, angle, bilateralOk, straightOk, "up");
                 pushMsg(st, msg);
                 playFormBeep();
                 setState((prev) => ({ ...prev, formGood: false }));
+              } else if (!reachedBottom) {
+                // User didn't go deep enough
+                const msg = "Bad form: Go deeper on the next rep!";
+                pushMsg(st, msg);
+                playFormBeep();
+                setState((prev) => ({ ...prev, formGood: false, formMessage: msg }));
               }
             }
           }
@@ -434,12 +555,19 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
       logSession(exercise.id, reps, duration);
       addChallengeReps(exercise.id, reps);
       addDailyWorkout(exercise.id, reps);
-      setStats(loadStats());
-      setState((s) => ({ ...s, repCount: 0, phase: "up", formMessage: "Saved! Great work 💪" }));
+      // Show summary modal
+      setLastSession({ reps, duration, exercise: exercise.name });
+      setShowSummary(true);
       sessionRepsRef.current = 0;
       sessionStartRef.current = Date.now();
     }
-  }, [exercise.id]);
+  }, [exercise.id, exercise.name]);
+
+  const closeSummary = () => {
+    setShowSummary(false);
+    setLastSession(null);
+    setState((s) => ({ ...s, repCount: 0, phase: "up", formMessage: "Stand by..." }));
+  };
 
   const togglePause = () => {
     setState((s) => ({ ...s, isPaused: !s.isPaused, formMessage: s.isPaused ? "Go!" : "Paused" }));
@@ -508,6 +636,46 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
           Finish & Save
         </button>
       </div>
+
+      {showSummary && lastSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="mx-auto mb-3 w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                <span className="text-3xl">💪</span>
+              </div>
+              <h3 className="text-2xl font-bold text-white">Workout Complete!</h3>
+              <p className="mt-1 text-slate-400">{lastSession.exercise} session saved</p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              <div className="rounded-xl bg-slate-800 p-4 text-center">
+                <p className="text-3xl font-bold text-white">{lastSession.reps}</p>
+                <p className="text-xs text-slate-400">{exercise.isHold ? "Seconds" : "Reps"}</p>
+              </div>
+              <div className="rounded-xl bg-slate-800 p-4 text-center">
+                <p className="text-3xl font-bold text-white">
+                  {Math.floor(lastSession.duration / 60)}:{String(lastSession.duration % 60).padStart(2, "0")}
+                </p>
+                <p className="text-xs text-slate-400">Duration</p>
+              </div>
+              <div className="rounded-xl bg-slate-800 p-4 text-center">
+                <p className="text-3xl font-bold text-white">
+                  {lastSession.duration > 0 ? Math.round((lastSession.reps / lastSession.duration) * 60) : 0}
+                </p>
+                <p className="text-xs text-slate-400">{exercise.isHold ? "Sec/min" : "Reps/min"}</p>
+              </div>
+            </div>
+
+            <button
+              onClick={closeSummary}
+              className="w-full py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
+            >
+              Awesome! Continue
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

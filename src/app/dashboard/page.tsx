@@ -106,6 +106,26 @@ export default function DashboardPage() {
             <p className="text-2xl font-bold text-white">{daily.byExercise["plank"] ?? 0}</p>
             <p className="text-xs text-slate-400">Plank sec</p>
           </div>
+          <div className="rounded-lg bg-slate-800 p-3">
+            <p className="text-2xl font-bold text-white">{daily.byExercise["pullup"] ?? 0}</p>
+            <p className="text-xs text-slate-400">Pull-ups</p>
+          </div>
+          <div className="rounded-lg bg-slate-800 p-3">
+            <p className="text-2xl font-bold text-white">{daily.byExercise["dips"] ?? 0}</p>
+            <p className="text-xs text-slate-400">Dips</p>
+          </div>
+          <div className="rounded-lg bg-slate-800 p-3">
+            <p className="text-2xl font-bold text-white">{daily.byExercise["lunges"] ?? 0}</p>
+            <p className="text-xs text-slate-400">Lunges</p>
+          </div>
+          <div className="rounded-lg bg-slate-800 p-3">
+            <p className="text-2xl font-bold text-white">{daily.byExercise["crunch"] ?? 0}</p>
+            <p className="text-xs text-slate-400">Crunches</p>
+          </div>
+          <div className="rounded-lg bg-slate-800 p-3">
+            <p className="text-2xl font-bold text-white">{daily.byExercise["burpee"] ?? 0}</p>
+            <p className="text-xs text-slate-400">Burpees</p>
+          </div>
         </div>
       </div>
 

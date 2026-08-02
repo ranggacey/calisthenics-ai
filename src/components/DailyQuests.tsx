@@ -20,6 +20,11 @@ const QUESTS: QuestDef[] = [
   { id: "q-squat", title: "Squat Day", description: "Do 50 squats today", icon: "🦵", goal: 50, metric: "reps", exercise: "squat" },
   { id: "q-pushup", title: "Push-Up Hour", description: "Do 30 push-ups today", icon: "💪", goal: 30, metric: "reps", exercise: "pushup" },
   { id: "q-plank", title: "Plank Time", description: "1 minute of plank today", icon: "⏱️", goal: 60, metric: "reps", exercise: "plank" },
+  { id: "q-pullup", title: "Pull-Up Power", description: "Do 10 pull-ups today", icon: "🧗", goal: 10, metric: "reps", exercise: "pullup" },
+  { id: "q-dips", title: "Dip Deep", description: "Do 20 dips today", icon: "🏋️", goal: 20, metric: "reps", exercise: "dips" },
+  { id: "q-lunges", title: "Lunge Long", description: "Do 40 lunges today", icon: "🦵", goal: 40, metric: "reps", exercise: "lunges" },
+  { id: "q-crunch", title: "Crunch Core", description: "Do 50 crunches today", icon: "🧘", goal: 50, metric: "reps", exercise: "crunch" },
+  { id: "q-burpee", title: "Burpee Burn", description: "Do 15 burpees today", icon: "🔥", goal: 15, metric: "reps", exercise: "burpee" },
   { id: "q-workout", title: "Show Up", description: "Complete 1 workout today", icon: "🏋️", goal: 1, metric: "workouts" },
 ];
 

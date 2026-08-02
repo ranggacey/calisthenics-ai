@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 
 // ============================================================
 // Exercise Selector — pick the exercise before starting
@@ -16,6 +15,11 @@ export const EXERCISE_OPTIONS: ExerciseOption[] = [
   { id: "squat", name: "Squat", icon: "🦵", description: "Leg day classic", target: "3-1-1 tempo" },
   { id: "pushup", name: "Push-Up", icon: "💪", description: "Upper body staple", target: "2-1-2 tempo" },
   { id: "plank", name: "Plank", icon: "⏱️", description: "Core endurance", target: "Hold 60s" },
+  { id: "pullup", name: "Pull-Up", icon: "🧗", description: "Back & biceps builder", target: "Full range" },
+  { id: "dips", name: "Dips", icon: "🏋️", description: "Triceps & chest", target: "Elbows 90°" },
+  { id: "lunges", name: "Lunges", icon: "🦵", description: "Unilateral leg strength", target: "Knee 90°" },
+  { id: "crunch", name: "Crunch", icon: "🧘", description: "Core isolation", target: "Controlled" },
+  { id: "burpee", name: "Burpee", icon: "🔥", description: "Full body conditioning", target: "Explosive" },
 ];
 
 export default function ExerciseSelector({
