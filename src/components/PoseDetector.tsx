@@ -42,6 +42,11 @@ export interface Exercise {
   /** Arah gerakan terbalik: down = angle NAIK (pullup: tekuk elbow 160°→60°; crunch: bangun 160°→60°).
    *  Exercise normal (squat/pushup): down = angle TURUN. State machine harus tahu arahnya. */
   inverted?: boolean;
+  /** Cek simetri kiri-kanan. LUNGE secara desain ASIMETRIS (kaki depan tekuk,
+   *  kaki belakang lurus → selisih angle ~90° > tolerance 40 → bilateralOk selalu
+   *  false → rep tidak pernah terhitung). CRUNCH gerakannya di torso, bukan lengan.
+   *  Skip bilateral untuk exercise yang gerakannya unilateral/torso. */
+  checkBilateral?: boolean;
   unit: string;
 }
 
@@ -124,6 +129,7 @@ export const EXERCISES: Exercise[] = [
     upAngle: 160, // standing
     targetAngle: 90,
     angleTolerance: 20,
+    checkBilateral: false, // lunge asimetris secara desain — bilateral check bikin rep gak pernah kehitung
     unit: "lunges",
   },
   {
@@ -138,6 +144,7 @@ export const EXERCISES: Exercise[] = [
     targetAngle: 160, // = posisi bawah (berbaring) — latch reachedBottom harus cocok
     angleTolerance: 25,
     inverted: true, // down (turun ke lantai) = torso lurus = angle NAIK ke ~160
+    checkBilateral: false, // gerakan di torso, bukan lengan — bilateral lengan tidak relevan
     unit: "crunches",
   },
   {
@@ -292,8 +299,9 @@ interface PoseDetectorProps {
 }
 
 // Guard parameters — biar rep cuma kehitung pas gerakan beneran
-const REQUIRED_FRAMES = 5; // frame berturut-turut untuk konfirmasi transisi
-const REP_COOLDOWN_MS = 800; // jeda minimal antar rep
+const REQUIRED_DOWN_FRAMES = 3; // frame di zona bawah untuk konfirmasi transisi down (anti phantom)
+const REQUIRED_UP_FRAMES = 2; // frame di zona atas untuk konfirmasi transisi up (rep cepat tetap kehitung)
+const REP_COOLDOWN_MS = 400; // jeda minimal antar rep — 400ms biar rep cepat (tempo tinggi) tetap kehitung
 const EMA_ALPHA = 0.35; // smoothing factor (0-1, makin kecil makin halus)
 const BILATERAL_TOLERANCE = 40; // selisih max angle kiri vs kanan (derajat)
 const STRAIGHT_TOLERANCE = 25; // deviasi max dari badan lurus
@@ -395,7 +403,7 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
 
             // Yuna debug log
             // console.log("Angles:", { rawAngle: rawAngle.toFixed(0), smoothAngle: angle.toFixed(0), leftAngle: leftAngle?.toFixed(0), rightAngle: rightAngle?.toFixed(0), straightAngle: straightAngle?.toFixed(0) });
-            // console.log("Form Checks:", { isDown, isUp, mainFormOk, bilateralOk, straightOk });
+            // console.log("Form Checks:", { isDown, mainFormOk, bilateralOk, straightOk });
 
             // Draw skeleton
             drawConnectors(
@@ -458,12 +466,18 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
             }
             const angle = smoothAngle;
 
-            // Bilateral check — kedua sisi tubuh harus konsisten
-            const [l1, l2, l3] = exercise.leftTriplet;
-            const [r1, r2, r3] = exercise.rightTriplet;
-            const leftAngle = lm[l1] && lm[l2] && lm[l3] ? angleBetween(lm[l1], lm[l2], lm[l3]) : angle;
-            const rightAngle = lm[r1] && lm[r2] && lm[r3] ? angleBetween(lm[r1], lm[r2], lm[r3]) : angle;
-            const bilateralOk = Math.abs(leftAngle - rightAngle) <= BILATERAL_TOLERANCE;
+            // Bilateral check — kedua sisi tubuh harus konsisten.
+            // Skip untuk exercise unilateral/torso (lunges asimetris, crunch di torso):
+            // checkBilateral=false → bilateralOk selalu true, form cek straightness saja.
+            const checkBilateral = exercise.checkBilateral !== false;
+            let bilateralOk = true;
+            if (checkBilateral) {
+              const [l1, l2, l3] = exercise.leftTriplet;
+              const [r1, r2, r3] = exercise.rightTriplet;
+              const leftAngle = lm[l1] && lm[l2] && lm[l3] ? angleBetween(lm[l1], lm[l2], lm[l3]) : angle;
+              const rightAngle = lm[r1] && lm[r2] && lm[r3] ? angleBetween(lm[r1], lm[r2], lm[r3]) : angle;
+              bilateralOk = Math.abs(leftAngle - rightAngle) <= BILATERAL_TOLERANCE;
+            }
 
             // Body straightness — badan harus lurus (hip drop detection)
             const [s1, s2, s3] = exercise.straightTriplet;
@@ -475,7 +489,6 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
             //   normal  (squat/pushup/dips/lunges/burpee): down = angle KECIL (tertekuk),  up = angle BESAR (lurus)
             //   inverted (pullup/crunch):                   down = angle BESAR (lurus/hanging), up = angle KECIL (tekuk)
             const isDown = exercise.inverted ? angle >= exercise.downAngle - 10 : angle <= exercise.downAngle + 10;
-            const isUp = exercise.inverted ? angle <= exercise.upAngle + 10 : angle >= exercise.upAngle - 10;
             const formOk = bilateralOk && straightOk; // form hanya cek bilateral dan straightness
 
             // Form message based on current angle, not rep counting logic
@@ -511,11 +524,20 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
               reachedBottom = true;
             }
 
-            // Frame confirmation counters
-            if (isDown) {
+            // Frame confirmation counters — hitung frame di "zona perjalanan" (bukan zona ekstrem).
+            // Rep cepat (tempo tinggi) melewati zona ekstrem (≤downAngle) cuma 2-3 frame,
+            // jadi frame count di zona ekstrem menolak rep cepat. Gunakan zona tengah LEBAR
+            // yang TIDAK overlap (bawah ≤ downAngle+20, atas ≥ upAngle−20):
+            //   - down: sudah mulai turun dari atas (angle < upAngle - 20)
+            //   - up:   sudah mulai naik dari bawah (angle > downAngle + 20)
+            // Anti phantom tetap aman: down butuh 3 frame (konfirmasi kuat), up 2 frame
+            // (rep cepat tetap kehitung) + sawUp + reachedBottom latch.
+            const headingDown = exercise.inverted ? angle > exercise.upAngle + 20 : angle < exercise.upAngle - 20;
+            const headingUp = exercise.inverted ? angle < exercise.downAngle - 20 : angle > exercise.downAngle + 20;
+            if (headingDown) {
               downFrames += 1;
               upFrames = 0;
-            } else if (isUp) {
+            } else if (headingUp) {
               upFrames += 1;
               downFrames = 0;
             } else {
@@ -524,14 +546,14 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
             }
 
             // State machine for rep counting
-            if (phase === "up" && sawUp && downFrames >= REQUIRED_FRAMES) {
+            if (phase === "up" && sawUp && downFrames >= REQUIRED_DOWN_FRAMES) {
               // Transisi ke fase "down" — hanya jika user benar-benar di posisi atas dulu
               phase = "down";
               sawUp = false;
               reachedBottom = false; // Reset for new rep
               setState((s) => ({ ...s, phase: "down" })); // formGood ditangani di atas
               playPhaseBeep(); // Audio/haptic cue for phase transition
-            } else if (phase === "down" && upFrames >= REQUIRED_FRAMES) {
+            } else if (phase === "down" && upFrames >= REQUIRED_UP_FRAMES) {
               // Transisi ke fase "up" - Rep selesai!
               phase = "up";
               sawUp = true; // User kembali di atas — rep berikutnya butuh turun penuh lagi
