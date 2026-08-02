@@ -24,21 +24,21 @@ function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number
   return (
     <li
       className={`flex items-center justify-between gap-4 p-4 rounded-lg shadow-sm ${
-        isTopThree ? 'bg-yellow-400/10 border border-yellow-400/30' : 'bg-card'
+        isTopThree ? 'bg-yellow-400/10 border border-yellow-400/30' : 'bg-slate-900 border border-slate-700'
       }`}
     >
       <div className="flex items-center gap-4 min-w-0">
         <RankBadge rank={rank} />
         <div className="min-w-0">
-          <p className="font-medium truncate">{entry.name}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="font-medium truncate text-white">{entry.name}</p>
+          <p className="text-xs text-slate-400">
             {entry.workouts ?? 0} workouts · {entry.streak ?? 0}-day streak
           </p>
         </div>
       </div>
       <div className="text-right shrink-0">
-        <p className="font-bold text-primary">{entry.score.toLocaleString()}</p>
-        <p className="text-xs text-muted-foreground">pts</p>
+        <p className="font-bold text-emerald-400">{entry.score.toLocaleString()}</p>
+        <p className="text-xs text-slate-500">pts</p>
       </div>
     </li>
   );
@@ -53,42 +53,54 @@ const LeaderboardPage = () => {
   const startRank = page * ENTRIES_PER_PAGE + 1;
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <h1 className="text-4xl font-bold mb-2">Leaderboard</h1>
-      <input type="text" placeholder="Search athletes..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} className="mb-4 p-2 border rounded w-full max-w-sm" />
-      <ul className="space-y-3">
-        {displayed.map((entry, i) => (
-          <LeaderboardRow key={entry.id} entry={entry} rank={startRank + i} />
-        ))}
-      </ul>
-      {leaderboard.length === 0 && (
-        <p className="text-center text-muted-foreground py-8">No athletes yet — be the first!</p>
-      )}
-      <div className="flex justify-between mt-6">
-        <button
-          onClick={() => setPage((p) => Math.max(p - 1, 0))}
-          disabled={page === 0}
-          className="px-4 py-2 bg-slate-700 text-white rounded disabled:opacity-50"
-        >
-          Previous
-        </button>
-        <span className="self-center">
-          Page {page + 1} of {totalPages + 1}
-        </span>
-        <button
-          onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-          disabled={page >= totalPages}
-          className="px-4 py-2 bg-slate-700 text-white rounded disabled:opacity-50"
-        >
-          Next
-        </button>
+    <div className="min-h-screen bg-slate-950 text-white">
+      <div className="container mx-auto py-8 px-4 max-w-3xl">
+        <h1 className="text-4xl font-bold mb-2">Leaderboard</h1>
+        <p className="text-slate-400 mb-6">Top athletes — aim for the top 3!</p>
+        <input
+          type="text"
+          placeholder="Search athletes..."
+          value={search}
+          onChange={e => { setSearch(e.target.value); setPage(0); }}
+          className="mb-4 p-2 rounded border border-slate-700 bg-slate-900 text-white placeholder-slate-500 w-full max-w-sm"
+        />
+        <ul className="space-y-3">
+          {displayed.map((entry, i) => (
+            <LeaderboardRow key={entry.id} entry={entry} rank={startRank + i} />
+          ))}
+        </ul>
+        {filtered.length === 0 && (
+          <p className="text-center text-slate-500 py-8">No athletes match your search.</p>
+        )}
+        {leaderboard.length === 0 && (
+          <p className="text-center text-slate-500 py-8">No athletes yet — be the first!</p>
+        )}
+        <div className="flex justify-between mt-6">
+          <button
+            onClick={() => setPage((p) => Math.max(p - 1, 0))}
+            disabled={page === 0}
+            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span className="self-center text-slate-400">
+            Page {page + 1} of {totalPages + 1}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+            disabled={page >= totalPages}
+            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+        <Link href="/dashboard" className="inline-block mt-6">
+          <button className="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md font-semibold">
+            <ArrowRight className="mr-2 h-4 w-4" />
+            Back to Dashboard
+          </button>
+        </Link>
       </div>
-      <Link href="/dashboard" className="inline-block mt-6">
-        <button className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
-          <ArrowRight className="mr-2 h-4 w-4" />
-          Back to Dashboard
-        </button>
-      </Link>
     </div>
   );
 };

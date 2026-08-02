@@ -142,7 +142,9 @@ export default function DashboardPage() {
               .map((r, i) => (
                 <li key={i} className="flex items-center justify-between rounded-lg bg-slate-800 px-4 py-2 text-sm">
                   <span className="font-medium capitalize text-white">{r.exercise}</span>
-                  <span className="text-slate-400">{r.reps} reps · {Math.floor(r.duration / 60)}m {r.duration % 60}s</span>
+                  <span className="text-slate-400">
+                    {r.reps} {r.exercise === "plank" ? "sec" : "reps"} · {Math.floor(r.duration / 60)}m {r.duration % 60}s
+                  </span>
                   <span className="text-slate-500">{new Date(r.date).toLocaleDateString()}</span>
                 </li>
               ))}
