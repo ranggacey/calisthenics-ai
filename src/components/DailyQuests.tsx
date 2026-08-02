@@ -6,20 +6,20 @@ import { loadDailyLog, type DailyLog } from "@/lib/storage";
 // Daily Quests — refresh every day, track TODAY'S reps only.
 // Progress murni dari cali_daily (log harian), bukan all-time.
 // ============================================================
-interface QuestDef {
+export interface QuestDef {
   id: string;
   title: string;
   description: string;
   icon: string;
   goal: number;
-  metric: "reps" | "workouts";
+  metric: "reps" | "workouts" | "seconds";
   exercise?: string;
 }
 
 const QUESTS: QuestDef[] = [
   { id: "q-squat", title: "Squat Day", description: "Do 50 squats today", icon: "🦵", goal: 50, metric: "reps", exercise: "squat" },
   { id: "q-pushup", title: "Push-Up Hour", description: "Do 30 push-ups today", icon: "💪", goal: 30, metric: "reps", exercise: "pushup" },
-  { id: "q-plank", title: "Plank Time", description: "1 minute of plank today", icon: "⏱️", goal: 60, metric: "reps", exercise: "plank" },
+  { id: "q-plank", title: "Plank Time", description: "Hold plank for 60 seconds today", icon: "⏱️", goal: 60, metric: "seconds", exercise: "plank" },
   { id: "q-pullup", title: "Pull-Up Power", description: "Do 10 pull-ups today", icon: "🧗", goal: 10, metric: "reps", exercise: "pullup" },
   { id: "q-dips", title: "Dip Deep", description: "Do 20 dips today", icon: "🏋️", goal: 20, metric: "reps", exercise: "dips" },
   { id: "q-lunges", title: "Lunge Long", description: "Do 40 lunges today", icon: "🦵", goal: 40, metric: "reps", exercise: "lunges" },
