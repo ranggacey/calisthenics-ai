@@ -260,15 +260,22 @@ function getFormFeedback(
   if (exercise.isHold) return "Pertahankan posisi lurus!";
 
   // Feedback spesifik untuk rep counting (jika form dasar sudah OK)
+  // Arah gerakan menentukan kondisi "belum dalam" vs "belum penuh":
+  //   normal  (squat/pushup): down = angle KECIL,   up = angle BESAR
+  //   inverted (pullup/crunch): down = angle BESAR,  up = angle KECIL
   if (currentPhase === "down") {
-    // Pengguna dalam fase 'down' - cek kedalaman
-    if (angle > exercise.targetAngle + exercise.angleTolerance) {
-      return "Turun lebih dalam!";
+    const shallow = exercise.inverted
+      ? angle < exercise.targetAngle - exercise.angleTolerance // belum lurus/hanging penuh
+      : angle > exercise.targetAngle + exercise.angleTolerance;
+    if (shallow) {
+      return exercise.inverted ? "Turun perlahan sampai lurus penuh!" : "Turun lebih dalam!";
     }
   } else if (currentPhase === "up") {
-    // Pengguna dalam fase 'up' - cek ekstensi
-    if (angle < exercise.upAngle - 15) {
-      return "Luruskan sepenuhnya di atas!";
+    const partial = exercise.inverted
+      ? angle > exercise.upAngle + 15 // elbow/torso belum tekuk penuh
+      : angle < exercise.upAngle - 15;
+    if (partial) {
+      return exercise.inverted ? "Angkat penuh sampai atas!" : "Luruskan sepenuhnya di atas!";
     }
   }
   
@@ -425,11 +432,15 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
                 if (plankStart !== 0) {
                   plankStart = 0;
                   setState((s) => ({ ...s, formGood: false, formMessage: "Pinggul turun! Jaga badan tetap lurus" }));
-                  // Gate anti-spam: beep hanya saat transisi ke form jelek
-                  if (!wasFormBad) {
-                    wasFormBad = true;
-                    playFormBeep();
-                  }
+                } else {
+                  // Mulai dengan form jelek (belum pernah latch posisi baik) — tetap kasih feedback,
+                  // jangan biarkan tampil "Form: Good" tanpa peringatan.
+                  setState((s) => ({ ...s, formGood: false, formMessage: "Pinggul turun! Jaga badan tetap lurus" }));
+                }
+                // Gate anti-spam: beep hanya saat transisi ke form jelek
+                if (!wasFormBad) {
+                  wasFormBad = true;
+                  playFormBeep();
                 }
               }
               // Form kembali baik → reset gate supaya bisa beep lagi saat turun berikutnya
@@ -590,8 +601,12 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
   // --- persist session on finish ---
   const finishSession = useCallback(() => {
     if (sessionRepsRef.current > 0) {
-      // Durasi = waktu AKTIF latihan saja (pause tidak dihitung — sessionStartRef di-reset saat resume)
-      const duration = Math.round((Date.now() - sessionStartRef.current + pausedAccumRef.current) / 1000);
+      const st = stateRef.current;
+      // Durasi = waktu AKTIF latihan saja. Kalau lagi paused, akumulasi pause
+      // sudah tersimpan di pausedAccumRef saat togglePause — jangan hitung
+      // (now − start) yang masih mencakup durasi pause (double-count).
+      const base = st.isPaused ? pausedAccumRef.current : Date.now() - sessionStartRef.current + pausedAccumRef.current;
+      const duration = Math.max(1, Math.round(base / 1000));
       const reps = sessionRepsRef.current;
       saveWorkoutSession(exercise.id, reps, duration);
       logSession(exercise.id, reps, duration);
