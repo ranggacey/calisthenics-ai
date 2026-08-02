@@ -242,34 +242,36 @@ function playPhaseBeep() {
 
 type FormPhase = "up" | "down" | "hold";
 
-function badFormReason(
+function getFormFeedback(
   exercise: Exercise,
   angle: number,
   bilateralOk: boolean,
   straightOk: boolean,
-  phase: FormPhase = "up"
+  currentPhase: FormPhase,
+  reachedBottom: boolean
 ): string {
-  if (!straightOk) return "Bad form: Keep your back straight!";
-  if (!bilateralOk) return "Bad form: Adjust body balance!";
-  if (exercise.isHold) return "Bad form: Maintain straight posture!";
+  if (!straightOk) return "Jaga punggung tetap lurus!";
+  if (!bilateralOk) return "Sesuaikan keseimbangan tubuh!";
+  if (exercise.isHold) return "Pertahankan posisi lurus!";
 
-  // Contextual feedback based on current phase
-  if (phase === "down") {
-    // User is in down phase - check if they went deep enough
+  // Feedback spesifik untuk rep counting (jika form dasar sudah OK)
+  if (currentPhase === "down") {
+    // Pengguna dalam fase 'down' - cek kedalaman
     if (angle > exercise.targetAngle + exercise.angleTolerance) {
-      return "Bad form: Go deeper!";
+      return "Turun lebih dalam!";
     }
-    if (angle < exercise.downAngle - 10) {
-      return "Bad form: Don't go too low!";
-    }
-  } else if (phase === "up") {
-    // User is in up phase - check if they extended fully
+  } else if (currentPhase === "up") {
+    // Pengguna dalam fase 'up' - cek ekstensi
     if (angle < exercise.upAngle - 15) {
-      return "Bad form: Extend fully at the top!";
+      return "Luruskan sepenuhnya di atas!";
     }
   }
+  
+  if (!reachedBottom && currentPhase === "up") {
+    return "Turun belum cukup dalam. Rep tidak dihitung!";
+  }
 
-  return "Bad form: Adjust your position!";
+  return "Form bagus!";
 }
 
 // ---------- Component ----------
@@ -451,7 +453,7 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
             // Form message based on current angle, not rep counting logic
             const currentPhase = phase === "down" ? "down" : "up";
             if (!formOk) {
-              const msg = badFormReason(exercise, angle, bilateralOk, straightOk, currentPhase);
+              const msg = getFormFeedback(exercise, angle, bilateralOk, straightOk, currentPhase, reachedBottom);
               pushMsg(st, msg);
               // Beep/vibrate HANYA saat transisi ke form jelek, bukan tiap frame (anti spam)
               if (!wasFormBad) {
@@ -506,21 +508,14 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
                   phase: "up",
                   repCount: s.repCount + 1,
                   formGood: true,
-                  formMessage: "Nice! Keep going 💪", // reset message ke default
+                  formMessage: "Keren! Lanjut terus 💪", // reset message ke default
                 }));
                 playRepBeep();
-              } else if (!formOk) {
-                // Jika rep tidak terhitung karena form jelek, berikan feedback
-                const msg = badFormReason(exercise, angle, bilateralOk, straightOk, "up");
+              } else { // Jika rep tidak terhitung karena form jelek atau belum cukup dalam
+                const msg = getFormFeedback(exercise, angle, bilateralOk, straightOk, "up", reachedBottom);
                 pushMsg(st, msg);
                 playFormBeep();
                 setState((prev) => ({ ...prev, formGood: false }));
-              } else if (!reachedBottom) {
-                // User didn't go deep enough
-                const msg = "Bad form: Go deeper on the next rep!";
-                pushMsg(st, msg);
-                playFormBeep();
-                setState((prev) => ({ ...prev, formGood: false, formMessage: msg }));
               }
             }
           }
