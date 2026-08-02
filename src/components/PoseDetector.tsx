@@ -39,6 +39,9 @@ export interface Exercise {
   angleTolerance: number;
   /** Plank mode: hitung detik, bukan rep */
   isHold?: boolean;
+  /** Arah gerakan terbalik: down = angle NAIK (pullup: tekuk elbow 160°→60°; crunch: bangun 160°→60°).
+   *  Exercise normal (squat/pushup): down = angle TURUN. State machine harus tahu arahnya. */
+  inverted?: boolean;
   unit: string;
 }
 
@@ -92,8 +95,9 @@ export const EXERCISES: Exercise[] = [
     straightTriplet: [23, 11, 12], // hip-shoulder-shoulder → body straight
     downAngle: 160, // arms extended (hanging)
     upAngle: 60, // chin over bar
-    targetAngle: 90,
+    targetAngle: 160, // = posisi bawah (hanging) — latch reachedBottom harus cocok
     angleTolerance: 25,
+    inverted: true, // down (turun dari bar) = elbow lurus = angle NAIK ke ~160
     unit: "pull-ups",
   },
   {
@@ -128,11 +132,12 @@ export const EXERCISES: Exercise[] = [
     keypoints: [11, 23, 25], // shoulder-hip-knee (torso angle)
     leftTriplet: [11, 13, 15],
     rightTriplet: [12, 14, 16],
-    straightTriplet: [11, 23, 25], // shoulder-hip-knee → spine alignment
+    straightTriplet: [23, 11, 12], // hip-shoulder-shoulder → garis badan, tetap lurus saat crunch-up
     downAngle: 160, // lying flat
     upAngle: 60, // crunched up
-    targetAngle: 90,
+    targetAngle: 160, // = posisi bawah (berbaring) — latch reachedBottom harus cocok
     angleTolerance: 25,
+    inverted: true, // down (turun ke lantai) = torso lurus = angle NAIK ke ~160
     unit: "crunches",
   },
   {
@@ -302,6 +307,7 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
 
   const sessionRepsRef = useRef(0);
   const sessionStartRef = useRef(0);
+  const pausedAccumRef = useRef(0); // akumulasi detik aktif sebelum pause (anti drift durasi)
   useEffect(() => {
     sessionStartRef.current = Date.now();
   }, []);
@@ -376,6 +382,7 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
               needsSessionReset = false;
               sessionRepsRef.current = 0;
               sessionStartRef.current = Date.now(); // durasi summary = waktu exercise aktif saja
+              pausedAccumRef.current = 0;
               setState((s) => ({ ...s, repCount: 0, phase: "up", formMessage: "Stand by..." }));
             }
 
@@ -453,8 +460,11 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
               lm[s1] && lm[s2] && lm[s3] ? angleBetween(lm[s1], lm[s2], lm[s3]) : 180;
             const straightOk = Math.abs(straightAngle - 180) <= STRAIGHT_TOLERANCE;
 
-            const isDown = angle <= exercise.downAngle + 10; // tertekuk cukup (lebih forgiving)
-            const isUp = angle >= exercise.upAngle - 10; // lurus cukup (lebih forgiving)
+            // Zona posisi — hormati arah gerakan:
+            //   normal  (squat/pushup/dips/lunges/burpee): down = angle KECIL (tertekuk),  up = angle BESAR (lurus)
+            //   inverted (pullup/crunch):                   down = angle BESAR (lurus/hanging), up = angle KECIL (tekuk)
+            const isDown = exercise.inverted ? angle >= exercise.downAngle - 10 : angle <= exercise.downAngle + 10;
+            const isUp = exercise.inverted ? angle <= exercise.upAngle + 10 : angle >= exercise.upAngle - 10;
             const formOk = bilateralOk && straightOk; // form hanya cek bilateral dan straightness
 
             // Form message based on current angle, not rep counting logic
@@ -476,9 +486,17 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
               setState((prev) => ({ ...prev, formGood: true }));
             }
 
-            // Track if user reached proper bottom position during down phase
+            // Track if user reached proper bottom position during down phase.
+            // Tolerant terhadap overshoot: latch juga saat angle sudah LEWAT target range
+            // (mis. squat dalam) — bukan hanya pas di dalam range. Strict = rep ditolak
+            // walau user gerak penuh. Arah gerakan (isDown) tetap divalidasi.
             const inTargetRange = Math.abs(angle - exercise.targetAngle) <= exercise.angleTolerance;
-            if (phase === "down" && isDown && inTargetRange) {
+            const passedTarget =
+              phase === "down" &&
+              (exercise.inverted
+                ? angle > exercise.targetAngle + exercise.angleTolerance
+                : angle < exercise.targetAngle - exercise.angleTolerance);
+            if (phase === "down" && isDown && (inTargetRange || passedTarget)) {
               reachedBottom = true;
             }
 
@@ -572,7 +590,8 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
   // --- persist session on finish ---
   const finishSession = useCallback(() => {
     if (sessionRepsRef.current > 0) {
-      const duration = Math.round((Date.now() - sessionStartRef.current) / 1000);
+      // Durasi = waktu AKTIF latihan saja (pause tidak dihitung — sessionStartRef di-reset saat resume)
+      const duration = Math.round((Date.now() - sessionStartRef.current + pausedAccumRef.current) / 1000);
       const reps = sessionRepsRef.current;
       saveWorkoutSession(exercise.id, reps, duration);
       logSession(exercise.id, reps, duration);
@@ -593,13 +612,24 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
   };
 
   const togglePause = useCallback(() => {
-    setState((s) => ({ ...s, isPaused: !s.isPaused, formMessage: s.isPaused ? "Go!" : "Paused" }));
+    setState((s) => {
+      const nowPaused = !s.isPaused;
+      // Pause: simpan akumulasi waktu aktif; Resume: mulai hitung ulang dari sekarang
+      // → durasi session = waktu latihan saja, pause tidak dihitung.
+      if (nowPaused) {
+        pausedAccumRef.current += Date.now() - sessionStartRef.current;
+      } else {
+        sessionStartRef.current = Date.now();
+      }
+      return { ...s, isPaused: nowPaused, formMessage: nowPaused ? "Paused" : "Go!" };
+    });
   }, []);
 
   const resetSession = useCallback(() => {
     setState((s) => ({ ...s, repCount: 0, phase: "up", formMessage: "Stand by..." }));
     sessionRepsRef.current = 0;
     sessionStartRef.current = Date.now();
+    pausedAccumRef.current = 0;
   }, []);
 
   return (
