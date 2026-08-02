@@ -323,6 +323,8 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
     let plankAccum = 0;
     let lastFrameAt = Date.now();
     let reachedBottom = false; // Track if user reached proper bottom position
+    let wasFormBad = false; // Gate beep/vibrate — hanya di transisi ke form jelek
+    let needsSessionReset = true; // Reset counter saat ganti exercise (1x per effect run)
 
     const pushMsg = (s: RepState, msg: string) => {
       if (msg !== lastFormMsg) {
@@ -366,6 +368,14 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
           lastFrameAt = now;
 
           if (lm && !st.isPaused) {
+            // Reset counter sekali saat ganti exercise (user pindah latihan)
+            if (needsSessionReset) {
+              needsSessionReset = false;
+              sessionRepsRef.current = 0;
+              sessionStartRef.current = Date.now(); // durasi summary = waktu exercise aktif saja
+              setState((s) => ({ ...s, repCount: 0, phase: "up", formMessage: "Stand by..." }));
+            }
+
             // Yuna debug log
             // console.log("Angles:", { rawAngle: rawAngle.toFixed(0), smoothAngle: angle.toFixed(0), leftAngle: leftAngle?.toFixed(0), rightAngle: rightAngle?.toFixed(0), straightAngle: straightAngle?.toFixed(0) });
             // console.log("Form Checks:", { isDown, isUp, mainFormOk, bilateralOk, straightOk });
@@ -443,11 +453,16 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
             if (!formOk) {
               const msg = badFormReason(exercise, angle, bilateralOk, straightOk, currentPhase);
               pushMsg(st, msg);
-              playFormBeep();
+              // Beep/vibrate HANYA saat transisi ke form jelek, bukan tiap frame (anti spam)
+              if (!wasFormBad) {
+                wasFormBad = true;
+                playFormBeep();
+              }
               // Jika form tidak ok, langsung tandai sebagai bad form
               setState((prev) => ({ ...prev, formGood: false, formMessage: msg }));
             } else {
               // Jika form kembali baik, hapus pesan error spesifik dan reset ke "Good form!"
+              wasFormBad = false;
               pushMsg(st, "Good form!");
               setState((prev) => ({ ...prev, formGood: true }));
             }
@@ -569,15 +584,15 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
     setState((s) => ({ ...s, repCount: 0, phase: "up", formMessage: "Stand by..." }));
   };
 
-  const togglePause = () => {
+  const togglePause = useCallback(() => {
     setState((s) => ({ ...s, isPaused: !s.isPaused, formMessage: s.isPaused ? "Go!" : "Paused" }));
-  };
+  }, []);
 
-  const resetSession = () => {
+  const resetSession = useCallback(() => {
     setState((s) => ({ ...s, repCount: 0, phase: "up", formMessage: "Stand by..." }));
     sessionRepsRef.current = 0;
     sessionStartRef.current = Date.now();
-  };
+  }, []);
 
   return (
     <div className="flex flex-col items-center w-full">
