@@ -1,30 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
+import { loadHistory, type SessionRecord } from "@/lib/storage";
 
 // ============================================================
 // Workout History — recent sessions from localStorage
 // ============================================================
-interface SessionRecord {
-  date: string;
-  exercise: string;
-  reps: number;
-  duration: number;
-}
-
-const KEY = "cali_history";
 
 export default function WorkoutHistory() {
   const [records, setRecords] = useState<SessionRecord[]>([]);
 
   useEffect(() => {
-    const load = () => {
-      try {
-        const raw = localStorage.getItem(KEY);
-        setRecords(raw ? (JSON.parse(raw) as SessionRecord[]) : []);
-      } catch {
-        setRecords([]);
-      }
-    };
+    const load = () => setRecords(loadHistory());
     load();
     window.addEventListener("storage", load);
     return () => window.removeEventListener("storage", load);

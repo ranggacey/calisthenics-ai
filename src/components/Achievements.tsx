@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { loadStats, type WorkoutStats } from "@/lib/storage";
+import { loadStats, loadAchievements, saveAchievements, type WorkoutStats } from "@/lib/storage";
 
 // ============================================================
 // Achievements — earned from real workout stats
@@ -40,8 +40,8 @@ export default function Achievements() {
         }
         return prevEarned;
       });
-      const prev = localStorage.getItem("cali_achievements");
-      if (prev !== JSON.stringify(ids)) localStorage.setItem("cali_achievements", JSON.stringify(ids));
+      const prev = loadAchievements();
+      if (JSON.stringify(prev) !== JSON.stringify(ids)) saveAchievements(ids);
     };
 
     updateAchievements(); // Panggil saat mount
