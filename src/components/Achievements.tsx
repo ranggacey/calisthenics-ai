@@ -25,15 +25,15 @@ const ACHIEVEMENTS: AchievementDef[] = [
 ];
 
 export default function Achievements() {
-  const [stats, setStats] = useState<WorkoutStats>(loadStats);
   const [earned, setEarned] = useState<string[]>([]);
 
   useEffect(() => {
-    const onStorage = () => setStats(loadStats());
-    window.addEventListener("storage", onStorage);
 
+    // Baca stats langsung dari storage setiap event — tidak depend pada state stats
+    // (dulu dep [stats] → listener di-register ulang tiap statistik berubah = leak)
     const updateAchievements = () => {
-      const ids = ACHIEVEMENTS.filter((a) => a.check(stats)).map((a) => a.id);
+      const s = loadStats();
+      const ids = ACHIEVEMENTS.filter((a) => a.check(s)).map((a) => a.id);
       setEarned((prevEarned) => {
         if (JSON.stringify(prevEarned.sort()) !== JSON.stringify(ids.sort())) {
           return ids;
@@ -46,8 +46,10 @@ export default function Achievements() {
 
     updateAchievements(); // Panggil saat mount
     window.addEventListener("storage", updateAchievements); // Panggil saat storage berubah
-    return () => window.removeEventListener("storage", updateAchievements);
-  }, [stats]);
+    return () => {
+      window.removeEventListener("storage", updateAchievements);
+    };
+  }, []);
 
   const earnedCount = earned.length;
 

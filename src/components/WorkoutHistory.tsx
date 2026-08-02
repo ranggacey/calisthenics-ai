@@ -13,17 +13,6 @@ interface SessionRecord {
 
 const KEY = "cali_history";
 
-export function logSession(exercise: string, reps: number, duration: number) {
-  try {
-    const raw = localStorage.getItem(KEY);
-    const list: SessionRecord[] = raw ? JSON.parse(raw) : [];
-    list.push({ date: new Date().toISOString(), exercise, reps, duration });
-    localStorage.setItem(KEY, JSON.stringify(list.slice(-50)));
-  } catch {
-    /* ignore */
-  }
-}
-
 export default function WorkoutHistory() {
   const [records, setRecords] = useState<SessionRecord[]>([]);
 
@@ -57,8 +46,11 @@ export default function WorkoutHistory() {
         {[...records].reverse().map((r, i) => (
           <li key={i} className="flex items-center justify-between rounded-lg bg-slate-800 px-4 py-2 text-sm">
             <span className="text-slate-300 font-medium capitalize">{r.exercise}</span>
-            <span className="text-slate-400">{new Date(r.date).toLocaleDateString()} {new Date(r.date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+            <span className="text-slate-400">
+              {new Date(r.date).toLocaleDateString()} {new Date(r.date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
             <span className="font-mono text-white">{r.reps} reps</span>
+            <span className="font-mono text-slate-500">{Math.floor(r.duration / 60)}:{String(r.duration % 60).padStart(2, "0")}m</span>
           </li>
         ))}
       </ul>

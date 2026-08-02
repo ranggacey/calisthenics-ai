@@ -412,15 +412,21 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
                 const secs = Math.floor(plankAccum);
                 sessionRepsRef.current = secs;
                 if (secs !== stateRef.current.repCount) {
-                  setState((s) => ({ ...s, formGood: true, repCount: secs, formMessage: `Keep it straight! ${secs}s` }));
+                  setState((s) => ({ ...s, formGood: true, repCount: secs, formMessage: `Pertahankan! ${secs}s` }));
                 }
               } else {
                 if (plankStart !== 0) {
                   plankStart = 0;
-                  setState((s) => ({ ...s, formGood: false, formMessage: "Hips dropping! Straighten your body" }));
-                  playFormBeep();
+                  setState((s) => ({ ...s, formGood: false, formMessage: "Pinggul turun! Jaga badan tetap lurus" }));
+                  // Gate anti-spam: beep hanya saat transisi ke form jelek
+                  if (!wasFormBad) {
+                    wasFormBad = true;
+                    playFormBeep();
+                  }
                 }
               }
+              // Form kembali baik → reset gate supaya bisa beep lagi saat turun berikutnya
+              if (good) wasFormBad = false;
               return;
             }
 

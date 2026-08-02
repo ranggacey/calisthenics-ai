@@ -60,9 +60,20 @@ export function writeJson(key: string, value: unknown) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    // Notify komponen di TAB YANG SAMA (storage event asli hanya antar-tab).
+    // Handler komponen hanya baca localStorage, jadi tidak ada loop.
+    window.dispatchEvent(new Event("storage"));
   } catch {
     /* storage full — ignore */
   }
+}
+
+/** Tanggal lokal (bukan UTC) dalam format YYYY-MM-DD — WIB user di Indonesia */
+export function localDateKey(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 // ---------- Stats ----------
@@ -70,16 +81,16 @@ export function loadStats(): WorkoutStats {
   return readJson<WorkoutStats>(STATS_KEY, defaultStats);
 }
 
-export function saveWorkoutSession(exerciseId: string, reps: number, durationSec: number) {
+export function saveWorkoutSession(exerciseId: string, reps: number, _durationSec: number) {
   const stats = loadStats();
   stats.totalReps += reps;
   stats.totalWorkouts += 1;
   stats.bestSet = Math.max(stats.bestSet, reps);
   stats.byExercise[exerciseId] = (stats.byExercise[exerciseId] ?? 0) + reps;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateKey();
   if (stats.lastWorkoutDate !== today) {
     if (stats.lastWorkoutDate) {
-      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const yesterday = localDateKey(new Date(Date.now() - 86400000));
       stats.streak = stats.lastWorkoutDate === yesterday ? stats.streak + 1 : 1;
     } else {
       stats.streak = 1;
@@ -115,9 +126,9 @@ export function addChallengeReps(exerciseId: string, reps: number) {
   writeJson(CHALLENGE_KEY, c);
 }
 
-// ---------- Daily log (harian, reset otomatis per tanggal) ----------
+// ---------- Daily log (harian, reset otomatis per tanggal LOKAL) ----------
 export function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDateKey();
 }
 
 export function loadDailyLog(): DailyLog {
