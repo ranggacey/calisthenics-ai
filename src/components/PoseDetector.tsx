@@ -325,6 +325,7 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
     let plankAccum = 0;
     let lastFrameAt = Date.now();
     let reachedBottom = false; // Track if user reached proper bottom position
+    let sawUp = true; // Anti double-count: butuh konfirmasi posisi atas sebelum rep baru
     let wasFormBad = false; // Gate beep/vibrate — hanya di transisi ke form jelek
     let needsSessionReset = true; // Reset counter saat ganti exercise (1x per effect run)
 
@@ -488,15 +489,17 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
             }
 
             // State machine for rep counting
-            if (phase === "up" && downFrames >= REQUIRED_FRAMES) {
-              // Transisi ke fase "down"
+            if (phase === "up" && sawUp && downFrames >= REQUIRED_FRAMES) {
+              // Transisi ke fase "down" — hanya jika user benar-benar di posisi atas dulu
               phase = "down";
+              sawUp = false;
               reachedBottom = false; // Reset for new rep
               setState((s) => ({ ...s, phase: "down" })); // formGood ditangani di atas
               playPhaseBeep(); // Audio/haptic cue for phase transition
             } else if (phase === "down" && upFrames >= REQUIRED_FRAMES) {
               // Transisi ke fase "up" - Rep selesai!
               phase = "up";
+              sawUp = true; // User kembali di atas — rep berikutnya butuh turun penuh lagi
               const cooldownOk = now - lastRepAt > REP_COOLDOWN_MS;
               // Rep hanya terhitung jika form bagus DAN user sudah mencapai posisi bawah yang benar
               if (cooldownOk && formOk && reachedBottom) {
@@ -514,7 +517,11 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
               } else { // Jika rep tidak terhitung karena form jelek atau belum cukup dalam
                 const msg = getFormFeedback(exercise, angle, bilateralOk, straightOk, "up", reachedBottom);
                 pushMsg(st, msg);
-                playFormBeep();
+                // Gate anti-spam: beep hanya saat transisi ke form jelek, bukan tiap rep gagal
+                if (!wasFormBad) {
+                  wasFormBad = true;
+                  playFormBeep();
+                }
                 setState((prev) => ({ ...prev, formGood: false }));
               }
             }
