@@ -25,9 +25,9 @@ export interface Exercise {
   /** Landmark triplet [joint, middle, joint] untuk angle utama */
   keypoints: [number, number, number];
   /** Triplet angle kiri [shoulder, elbow, wrist] */
-  leftTriplet: [number, number, number];
+  leftTriplet?: [number, number, number];
   /** Triplet angle kanan [shoulder, elbow, wrist] */
-  rightTriplet: [number, number, number];
+  rightTriplet?: [number, number, number];
   /** Triplet straightness badan [hip, shoulder, elbow] */
   straightTriplet: [number, number, number];
   /** Angle saat posisi bawah (tertekuk penuh) — strict */
@@ -150,14 +150,12 @@ export const EXERCISES: Exercise[] = [
   {
     id: "burpee",
     name: "Burpee",
-    keypoints: [11, 13, 15], // using pushup phase for rep counting
-    leftTriplet: [11, 13, 15],
-    rightTriplet: [12, 14, 16],
-    straightTriplet: [23, 11, 12], // body straight during pushup
-    downAngle: 90, // pushup bottom
-    upAngle: 160, // standing/jump top
-    targetAngle: 90,
-    angleTolerance: 30,
+    keypoints: [23, 25, 27], // hip-knee-ankle (left leg) for stand-up/squat
+    straightTriplet: [23, 11, 12], // body straight during plank/pushup
+    downAngle: 90, // deep squat position (bottom of burpee)
+    upAngle: 170, // standing tall (top of burpee)
+    targetAngle: 90, // target angle for reachedBottom (deep squat)
+    angleTolerance: 20, // Adjusted tolerance
     unit: "burpees",
   },
 ];
@@ -471,7 +469,7 @@ export default function PoseDetector({ exerciseId = "squat" }: PoseDetectorProps
             // checkBilateral=false → bilateralOk selalu true, form cek straightness saja.
             const checkBilateral = exercise.checkBilateral !== false;
             let bilateralOk = true;
-            if (checkBilateral) {
+            if (checkBilateral && exercise.leftTriplet && exercise.rightTriplet) {
               const [l1, l2, l3] = exercise.leftTriplet;
               const [r1, r2, r3] = exercise.rightTriplet;
               const leftAngle = lm[l1] && lm[l2] && lm[l3] ? angleBetween(lm[l1], lm[l2], lm[l3]) : angle;
