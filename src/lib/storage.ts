@@ -81,7 +81,7 @@ export function loadStats(): WorkoutStats {
   return readJson<WorkoutStats>(STATS_KEY, defaultStats);
 }
 
-export function saveWorkoutSession(exerciseId: string, reps: number, _durationSec: number) {
+export function saveWorkoutSession(exerciseId: string, reps: number, durationSec: number) {
   const stats = loadStats();
   stats.totalReps += reps;
   stats.totalWorkouts += 1;
