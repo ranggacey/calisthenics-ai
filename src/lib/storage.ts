@@ -81,6 +81,7 @@ export function loadStats(): WorkoutStats {
   return readJson<WorkoutStats>(STATS_KEY, defaultStats);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function saveWorkoutSession(exerciseId: string, reps: number, durationSec: number) {
   const stats = loadStats();
   stats.totalReps += reps;
